@@ -7,10 +7,10 @@ import (
 )
 
 type Gameboy struct {
-	cpu               *CPU
-	mmu               *MMU
-	interruptsOn      bool
-	interruptsPending bool
+	cpu                      *CPU
+	mmu                      *MMU
+	interruptsOn             bool
+	interruptsPendingEnabled bool
 }
 
 func NewGameboy() *Gameboy {

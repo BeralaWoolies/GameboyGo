@@ -1376,7 +1376,7 @@ var instructions = [0x100]func(gb *Gameboy){
 		// RETI
 		fmt.Println("Decoded OPCODE: RETI")
 		gb.instrRet()
-		gb.interruptsPending = true
+		gb.interruptsPendingEnabled = true
 	},
 	0xDA: func(gb *Gameboy) {
 		// JP C, a16
@@ -1555,7 +1555,7 @@ var instructions = [0x100]func(gb *Gameboy){
 	0xFB: func(gb *Gameboy) {
 		// EI
 		fmt.Println("Decoded OPCODE: EI")
-		gb.interruptsPending = true
+		gb.interruptsPendingEnabled = true
 	},
 	0xFC: func(gb *Gameboy) {
 		// ILLEGAL OPCODE 0xFC
