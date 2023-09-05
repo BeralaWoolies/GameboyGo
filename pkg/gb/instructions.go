@@ -56,18 +56,22 @@ func (gb *Gameboy) nextPC16() uint16 {
 	return uint16(hiByte)<<8 | uint16(loByte)
 }
 
-func (gb *Gameboy) instrInc(incHandler func(), val uint8) {
-	incHandler()
-	gb.cpu.setZ(val+1 == 0)
-	gb.cpu.setN(false)
-	gb.cpu.setH(bits.IsHalfCarryAdd(val, 1))
+func (gb *Gameboy) instrInc(setHandler func(result uint8), val uint8) {
+	result := val + 1
+	setHandler(result)
+
+	gb.cpu.setZFlag(result == 0)
+	gb.cpu.setNFlag(false)
+	gb.cpu.setHFlag((val&0xF)+(1&0xF) > 0xF)
 }
 
-func (gb *Gameboy) instrDec(decHandler func(), val uint8) {
-	decHandler()
-	gb.cpu.setZ(val-1 == 0)
-	gb.cpu.setN(true)
-	gb.cpu.setH(val&0x0F == 0)
+func (gb *Gameboy) instrDec(setHandler func(result uint8), val uint8) {
+	result := val - 1
+	setHandler(result)
+
+	gb.cpu.setZFlag(result == 0)
+	gb.cpu.setNFlag(true)
+	gb.cpu.setHFlag(val&0xF == 0)
 }
 
 func (gb *Gameboy) instrAddA(rhs uint8, addCarry bool) {
@@ -78,12 +82,12 @@ func (gb *Gameboy) instrAddA(rhs uint8, addCarry bool) {
 
 	lhs := gb.cpu.reg.A
 	result := int16(lhs) + int16(rhs) + carry
-	gb.cpu.reg.A = uint8(result)
+	gb.cpu.setA(uint8(result))
 
-	gb.cpu.setZ(gb.cpu.reg.A == 0)
-	gb.cpu.setN(false)
-	gb.cpu.setH((lhs&0xF)+(rhs&0xF)+uint8(carry) > 0xF)
-	gb.cpu.setC(result > 0xFF)
+	gb.cpu.setZFlag(gb.cpu.reg.A == 0)
+	gb.cpu.setNFlag(false)
+	gb.cpu.setHFlag((lhs&0xF)+(rhs&0xF)+uint8(carry) > 0xF)
+	gb.cpu.setCFlag(result > 0xFF)
 }
 
 func (gb *Gameboy) instrSubA(rhs uint8, subCarry bool) {
@@ -94,21 +98,21 @@ func (gb *Gameboy) instrSubA(rhs uint8, subCarry bool) {
 
 	lhs := gb.cpu.reg.A
 	result := int16(lhs) - int16(rhs) - carry
-	gb.cpu.reg.A = uint8(result)
+	gb.cpu.setA(uint8(result))
 
-	gb.cpu.setZ(gb.cpu.reg.A == 0)
-	gb.cpu.setN(true)
-	gb.cpu.setH(int16(lhs&0xF)-int16(rhs&0xF)-carry < 0)
-	gb.cpu.setC(result < 0)
+	gb.cpu.setZFlag(gb.cpu.reg.A == 0)
+	gb.cpu.setNFlag(true)
+	gb.cpu.setHFlag(int16(lhs&0xF)-int16(rhs&0xF)-carry < 0)
+	gb.cpu.setCFlag(result < 0)
 }
 
 func (gb *Gameboy) instrAdd16(setHandler func(result uint16), val1 uint16, val2 uint16) {
 	result := int32(val1) + int32(val2)
 	setHandler(uint16(result))
 
-	gb.cpu.setN(false)
-	gb.cpu.setH(int32(val1&0xFFF) > (result & 0xFFF))
-	gb.cpu.setC(result > 0xFFFF)
+	gb.cpu.setNFlag(false)
+	gb.cpu.setHFlag(int32(val1&0xFFF) > (result & 0xFFF))
+	gb.cpu.setCFlag(result > 0xFFFF)
 }
 
 func (gb *Gameboy) instrAdd16Signed(setHandler func(result uint16), val1 uint16, val2 int8) {
@@ -117,60 +121,60 @@ func (gb *Gameboy) instrAdd16Signed(setHandler func(result uint16), val1 uint16,
 
 	carryBits := val1 ^ uint16(val2) ^ result
 
-	gb.cpu.setZ(false)
-	gb.cpu.setN(false)
-	gb.cpu.setH((carryBits & 0x10) == 0x10)
-	gb.cpu.setC((carryBits & 0x100) == 0x100)
+	gb.cpu.setZFlag(false)
+	gb.cpu.setNFlag(false)
+	gb.cpu.setHFlag((carryBits & 0x10) == 0x10)
+	gb.cpu.setCFlag((carryBits & 0x100) == 0x100)
 }
 
 func (gb *Gameboy) instrAndA(rhs uint8) {
-	gb.cpu.reg.A &= rhs
+	gb.cpu.setA(gb.cpu.reg.A & rhs)
 
-	gb.cpu.setZ(gb.cpu.reg.A == 0)
-	gb.cpu.setN(false)
-	gb.cpu.setH(true)
-	gb.cpu.setC(false)
+	gb.cpu.setZFlag(gb.cpu.reg.A == 0)
+	gb.cpu.setNFlag(false)
+	gb.cpu.setHFlag(true)
+	gb.cpu.setCFlag(false)
 }
 
 func (gb *Gameboy) instrXorA(rhs uint8) {
-	gb.cpu.reg.A ^= rhs
+	gb.cpu.setA(gb.cpu.reg.A ^ rhs)
 
-	gb.cpu.setZ(gb.cpu.reg.A == 0)
-	gb.cpu.setN(false)
-	gb.cpu.setH(false)
-	gb.cpu.setC(false)
+	gb.cpu.setZFlag(gb.cpu.reg.A == 0)
+	gb.cpu.setNFlag(false)
+	gb.cpu.setHFlag(false)
+	gb.cpu.setCFlag(false)
 }
 
 func (gb *Gameboy) instrOrA(rhs uint8) {
-	gb.cpu.reg.A |= rhs
+	gb.cpu.setA(gb.cpu.reg.A | rhs)
 
-	gb.cpu.setZ(gb.cpu.reg.A == 0)
-	gb.cpu.setN(false)
-	gb.cpu.setH(false)
-	gb.cpu.setC(false)
+	gb.cpu.setZFlag(gb.cpu.reg.A == 0)
+	gb.cpu.setNFlag(false)
+	gb.cpu.setHFlag(false)
+	gb.cpu.setCFlag(false)
 }
 
 func (gb *Gameboy) instrCpA(rhs uint8) {
 	lhs := gb.cpu.reg.A
 	cmpResult := lhs - rhs
 
-	gb.cpu.setZ(cmpResult == 0)
-	gb.cpu.setN(true)
-	gb.cpu.setH((rhs & 0xF) > (lhs & 0xF))
-	gb.cpu.setC(rhs > lhs)
+	gb.cpu.setZFlag(cmpResult == 0)
+	gb.cpu.setNFlag(true)
+	gb.cpu.setHFlag((rhs & 0xF) > (lhs & 0xF))
+	gb.cpu.setCFlag(rhs > lhs)
 }
 
 func (gb *Gameboy) instrJump(jumpAddress uint16) {
-	gb.cpu.reg.PC = jumpAddress
+	gb.cpu.setPC(jumpAddress)
 }
 
 func (gb *Gameboy) instrRet() {
-	gb.cpu.reg.PC = gb.popStack()
+	gb.cpu.setPC(gb.popStack())
 }
 
 func (gb *Gameboy) instrCall(jumpAddress uint16) {
 	gb.pushStack(gb.cpu.reg.PC)
-	gb.cpu.reg.PC = jumpAddress
+	gb.cpu.setPC(jumpAddress)
 }
 
 var instructions = [0x100]func(gb *Gameboy){
@@ -180,8 +184,8 @@ var instructions = [0x100]func(gb *Gameboy){
 		return
 	},
 	0x01: func(gb *Gameboy) {
-		// LD BC, n16
-		fmt.Println("Decoded OPCODE: LD BC, n16")
+		// LD BC, u16
+		fmt.Println("Decoded OPCODE: LD BC, u16")
 		gb.cpu.setBC(gb.nextPC16())
 	},
 	0x02: func(gb *Gameboy) {
@@ -197,32 +201,32 @@ var instructions = [0x100]func(gb *Gameboy){
 	0x04: func(gb *Gameboy) {
 		// INC B
 		fmt.Println("Decoded OPCODE: INC B")
-		gb.instrInc(func() { gb.cpu.reg.B++ }, gb.cpu.reg.B)
+		gb.instrInc(gb.cpu.setB, gb.cpu.reg.B)
 	},
 	0x05: func(gb *Gameboy) {
 		// DEC B
 		fmt.Println("Decoded OPCODE: DEC B")
-		gb.instrDec(func() { gb.cpu.reg.B-- }, gb.cpu.reg.B)
+		gb.instrDec(gb.cpu.setB, gb.cpu.reg.B)
 	},
 	0x06: func(gb *Gameboy) {
-		// LD B, n8
-		fmt.Println("Decoded OPCODE: LD B, n8")
-		gb.cpu.reg.B = gb.nextPC()
+		// LD B, u8
+		fmt.Println("Decoded OPCODE: LD B, u8")
+		gb.cpu.setB(gb.nextPC())
 	},
 	0x07: func(gb *Gameboy) {
 		// RLCA
 		fmt.Println("Decoded OPCODE: RLCA")
 		val := gb.cpu.reg.A
-		gb.cpu.reg.A = uint8((val << 1)) | (val >> 7)
+		gb.cpu.setA(uint8((val << 1)) | (val >> 7))
 
-		gb.cpu.setZ(false)
-		gb.cpu.setN(false)
-		gb.cpu.setH(false)
-		gb.cpu.setC(val >= 0x80)
+		gb.cpu.setZFlag(false)
+		gb.cpu.setNFlag(false)
+		gb.cpu.setHFlag(false)
+		gb.cpu.setCFlag(val >= 0x80)
 	},
 	0x08: func(gb *Gameboy) {
-		// LD [a16], SP
-		fmt.Println("Decoded OPCODE: LD [a16], SP")
+		// LD [u16], SP
+		fmt.Println("Decoded OPCODE: LD [u16], SP")
 		address := gb.nextPC16()
 		gb.mmu.write(address, bits.LoByte(gb.cpu.reg.SP))
 		gb.mmu.write(address+1, bits.HiByte(gb.cpu.reg.SP))
@@ -235,7 +239,7 @@ var instructions = [0x100]func(gb *Gameboy){
 	0x0A: func(gb *Gameboy) {
 		// LD A, [BC]
 		fmt.Println("Decoded OPCODE: LD A, [BC]")
-		gb.cpu.reg.A = gb.mmu.read(gb.cpu.getBC())
+		gb.cpu.setA(gb.mmu.read(gb.cpu.getBC()))
 	},
 	0x0B: func(gb *Gameboy) {
 		// DEC BC
@@ -245,28 +249,28 @@ var instructions = [0x100]func(gb *Gameboy){
 	0x0C: func(gb *Gameboy) {
 		// INC C
 		fmt.Println("Decoded OPCODE: INC C")
-		gb.instrInc(func() { gb.cpu.reg.C++ }, gb.cpu.reg.C)
+		gb.instrInc(gb.cpu.setC, gb.cpu.reg.C)
 	},
 	0x0D: func(gb *Gameboy) {
 		// DEC C
 		fmt.Println("Decoded OPCODE: DEC C")
-		gb.instrDec(func() { gb.cpu.reg.C-- }, gb.cpu.reg.C)
+		gb.instrDec(gb.cpu.setC, gb.cpu.reg.C)
 	},
 	0x0E: func(gb *Gameboy) {
-		// LD C, n8
-		fmt.Println("Decoded OPCODE: LD C, n8")
-		gb.cpu.reg.C = gb.nextPC()
+		// LD C, u8
+		fmt.Println("Decoded OPCODE: LD C, u8")
+		gb.cpu.setC(gb.nextPC())
 	},
 	0x0F: func(gb *Gameboy) {
 		// RRCA
 		fmt.Println("Decoded OPCODE: RRCA")
 		val := gb.cpu.reg.A
-		gb.cpu.reg.A = (val >> 1) | ((val & 1) << 7)
+		gb.cpu.setA((val >> 1) | ((val & 1) << 7))
 
-		gb.cpu.setZ(false)
-		gb.cpu.setN(false)
-		gb.cpu.setH(false)
-		gb.cpu.setC(gb.cpu.reg.A >= 0x80)
+		gb.cpu.setZFlag(false)
+		gb.cpu.setNFlag(false)
+		gb.cpu.setHFlag(false)
+		gb.cpu.setCFlag(gb.cpu.reg.A >= 0x80)
 	},
 	0x10: func(gb *Gameboy) {
 		// STOP
@@ -275,8 +279,8 @@ var instructions = [0x100]func(gb *Gameboy){
 		gb.nextPC()
 	},
 	0x11: func(gb *Gameboy) {
-		// LD DE, n16
-		fmt.Println("Decoded OPCODE: LD DE, n16")
+		// LD DE, u16
+		fmt.Println("Decoded OPCODE: LD DE, u16")
 		gb.cpu.setDE(gb.nextPC16())
 	},
 	0x12: func(gb *Gameboy) {
@@ -292,17 +296,17 @@ var instructions = [0x100]func(gb *Gameboy){
 	0x14: func(gb *Gameboy) {
 		// INC D
 		fmt.Println("Decoded OPCODE: INC D")
-		gb.instrInc(func() { gb.cpu.reg.D++ }, gb.cpu.reg.D)
+		gb.instrInc(gb.cpu.setD, gb.cpu.reg.D)
 	},
 	0x15: func(gb *Gameboy) {
 		// DEC D
 		fmt.Println("Decoded OPCODE: DEC D")
-		gb.instrDec(func() { gb.cpu.reg.D-- }, gb.cpu.reg.D)
+		gb.instrDec(gb.cpu.setD, gb.cpu.reg.D)
 	},
 	0x16: func(gb *Gameboy) {
-		// LD D, n8
-		fmt.Println("Decoded OPCODE: LD D, n8")
-		gb.cpu.reg.D = gb.nextPC()
+		// LD D, u8
+		fmt.Println("Decoded OPCODE: LD D, u8")
+		gb.cpu.setD(gb.nextPC())
 	},
 	0x17: func(gb *Gameboy) {
 		// RLA
@@ -313,16 +317,16 @@ var instructions = [0x100]func(gb *Gameboy){
 		}
 
 		val := gb.cpu.reg.A
-		gb.cpu.reg.A = uint8(val<<1) + carry
+		gb.cpu.setA(uint8(val<<1) | carry)
 
-		gb.cpu.setZ(false)
-		gb.cpu.setN(false)
-		gb.cpu.setH(false)
-		gb.cpu.setC(val >= 0x80)
+		gb.cpu.setZFlag(false)
+		gb.cpu.setNFlag(false)
+		gb.cpu.setHFlag(false)
+		gb.cpu.setCFlag(val >= 0x80)
 	},
 	0x18: func(gb *Gameboy) {
-		// JR e8
-		fmt.Println("Decoded OPCODE: JR e8")
+		// JR i8
+		fmt.Println("Decoded OPCODE: JR i8")
 		jumpAddress := int32(gb.cpu.reg.PC) + int32(int8(gb.nextPC()))
 		gb.instrJump(uint16(jumpAddress))
 	},
@@ -334,7 +338,7 @@ var instructions = [0x100]func(gb *Gameboy){
 	0x1A: func(gb *Gameboy) {
 		// LD A, [DE]
 		fmt.Println("Decoded OPCODE: LD A, [DE]")
-		gb.cpu.reg.A = gb.mmu.read(gb.cpu.getDE())
+		gb.cpu.setA(gb.mmu.read(gb.cpu.getDE()))
 	},
 	0x1B: func(gb *Gameboy) {
 		// DEC DE
@@ -344,17 +348,17 @@ var instructions = [0x100]func(gb *Gameboy){
 	0x1C: func(gb *Gameboy) {
 		// INC E
 		fmt.Println("Decoded OPCODE: INC E")
-		gb.instrInc(func() { gb.cpu.reg.E++ }, gb.cpu.reg.E)
+		gb.instrInc(gb.cpu.setE, gb.cpu.reg.E)
 	},
 	0x1D: func(gb *Gameboy) {
 		// DEC E
 		fmt.Println("Decoded OPCODE: DEC E")
-		gb.instrDec(func() { gb.cpu.reg.E-- }, gb.cpu.reg.E)
+		gb.instrDec(gb.cpu.setE, gb.cpu.reg.E)
 	},
 	0x1E: func(gb *Gameboy) {
-		// LD E, n8
-		fmt.Println("Decoded OPCODE: LD E, n8")
-		gb.cpu.reg.E = gb.nextPC()
+		// LD E, u8
+		fmt.Println("Decoded OPCODE: LD E, u8")
+		gb.cpu.setE(gb.nextPC())
 	},
 	0x1F: func(gb *Gameboy) {
 		// RRA
@@ -365,16 +369,16 @@ var instructions = [0x100]func(gb *Gameboy){
 		}
 
 		val := gb.cpu.reg.A
-		gb.cpu.reg.A = uint8(val>>1) | carry
+		gb.cpu.setA(uint8(val>>1) | carry)
 
-		gb.cpu.setZ(false)
-		gb.cpu.setN(false)
-		gb.cpu.setH(false)
-		gb.cpu.setC((val & 1) == 1)
+		gb.cpu.setZFlag(false)
+		gb.cpu.setNFlag(false)
+		gb.cpu.setHFlag(false)
+		gb.cpu.setCFlag((val & 1) == 1)
 	},
 	0x20: func(gb *Gameboy) {
-		// JR NZ, e8
-		fmt.Println("Decoded OPCODE: JR NZ, e8")
+		// JR NZ, i8
+		fmt.Println("Decoded OPCODE: JR NZ, i8")
 		offset := int8(gb.nextPC())
 		if !gb.cpu.zFlag() {
 			jumpAddress := int32(gb.cpu.reg.PC) + int32(offset)
@@ -383,8 +387,8 @@ var instructions = [0x100]func(gb *Gameboy){
 		}
 	},
 	0x21: func(gb *Gameboy) {
-		// LD HL, n16
-		fmt.Println("Decoded OPCODE: LD HL, n16")
+		// LD HL, u16
+		fmt.Println("Decoded OPCODE: LD HL, u16")
 		gb.cpu.setHL(gb.nextPC16())
 	},
 	0x22: func(gb *Gameboy) {
@@ -401,17 +405,17 @@ var instructions = [0x100]func(gb *Gameboy){
 	0x24: func(gb *Gameboy) {
 		// INC H
 		fmt.Println("Decoded OPCODE: INC H")
-		gb.instrInc(func() { gb.cpu.reg.H++ }, gb.cpu.reg.H)
+		gb.instrInc(gb.cpu.setH, gb.cpu.reg.H)
 	},
 	0x25: func(gb *Gameboy) {
 		// DEC H
 		fmt.Println("Decoded OPCODE: DEC H")
-		gb.instrDec(func() { gb.cpu.reg.H-- }, gb.cpu.reg.H)
+		gb.instrDec(gb.cpu.setH, gb.cpu.reg.H)
 	},
 	0x26: func(gb *Gameboy) {
-		// LD H, n8
-		fmt.Println("Decoded OPCODE: LD H, n8")
-		gb.cpu.reg.H = gb.nextPC()
+		// LD H, u8
+		fmt.Println("Decoded OPCODE: LD H, u8")
+		gb.cpu.setH(gb.nextPC())
 	},
 	0x27: func(gb *Gameboy) {
 		// DAA
@@ -419,9 +423,9 @@ var instructions = [0x100]func(gb *Gameboy){
 		if !gb.cpu.nFlag() {
 			if gb.cpu.cFlag() || gb.cpu.reg.A > 0x99 {
 				gb.cpu.reg.A += 0x60
-				gb.cpu.setC(true)
+				gb.cpu.setCFlag(true)
 			}
-			if gb.cpu.hFlag() || (gb.cpu.reg.A&0xF) > 9 {
+			if gb.cpu.hFlag() || (gb.cpu.reg.A&0xF) > 0x09 {
 				gb.cpu.reg.A += 0x06
 			}
 		} else {
@@ -429,16 +433,16 @@ var instructions = [0x100]func(gb *Gameboy){
 				gb.cpu.reg.A -= 0x60
 			}
 			if gb.cpu.hFlag() {
-				gb.cpu.reg.A -= 0x6
+				gb.cpu.reg.A -= 0x06
 			}
 		}
 
-		gb.cpu.setZ(gb.cpu.reg.A == 0)
-		gb.cpu.setH(false)
+		gb.cpu.setZFlag(gb.cpu.reg.A == 0)
+		gb.cpu.setHFlag(false)
 	},
 	0x28: func(gb *Gameboy) {
-		// JR Z, e8
-		fmt.Println("Decoded OPCODE: JR Z, e8")
+		// JR Z, i8
+		fmt.Println("Decoded OPCODE: JR Z, i8")
 		offset := int8(gb.nextPC())
 		if gb.cpu.zFlag() {
 			jumpAddress := int32(gb.cpu.reg.PC) + int32(offset)
@@ -454,7 +458,7 @@ var instructions = [0x100]func(gb *Gameboy){
 	0x2A: func(gb *Gameboy) {
 		// LD A, [HL+]
 		fmt.Println("Decoded OPCODE: LD A, [HL+]")
-		gb.cpu.reg.A = gb.mmu.read(gb.cpu.getHL())
+		gb.cpu.setA(gb.mmu.read(gb.cpu.getHL()))
 		gb.cpu.setHL(gb.cpu.getHL() + 1)
 	},
 	0x2B: func(gb *Gameboy) {
@@ -465,28 +469,28 @@ var instructions = [0x100]func(gb *Gameboy){
 	0x2C: func(gb *Gameboy) {
 		// INC L
 		fmt.Println("Decoded OPCODE: INC L")
-		gb.instrInc(func() { gb.cpu.reg.L++ }, gb.cpu.reg.L)
+		gb.instrInc(gb.cpu.setL, gb.cpu.reg.L)
 	},
 	0x2D: func(gb *Gameboy) {
 		// DEC L
 		fmt.Println("Decoded OPCODE: DEC L")
-		gb.instrDec(func() { gb.cpu.reg.L-- }, gb.cpu.reg.L)
+		gb.instrDec(gb.cpu.setL, gb.cpu.reg.L)
 	},
 	0x2E: func(gb *Gameboy) {
-		// LD L, n8
-		fmt.Println("Decoded OPCODE: LD L, n8")
-		gb.cpu.reg.L = gb.nextPC()
+		// LD L, u8
+		fmt.Println("Decoded OPCODE: LD L, u8")
+		gb.cpu.setL(gb.nextPC())
 	},
 	0x2F: func(gb *Gameboy) {
 		// CPL
 		fmt.Println("Decoded OPCODE: CPL")
 		gb.cpu.reg.A = ^(gb.cpu.reg.A)
-		gb.cpu.setN(true)
-		gb.cpu.setH(true)
+		gb.cpu.setNFlag(true)
+		gb.cpu.setHFlag(true)
 	},
 	0x30: func(gb *Gameboy) {
-		// JR NC, e8
-		fmt.Println("Decoded OPCODE: JR NC, e8")
+		// JR NC, i8
+		fmt.Println("Decoded OPCODE: JR NC, i8")
 		offset := int8(gb.nextPC())
 		if !gb.cpu.cFlag() {
 			jumpAddress := int32(gb.cpu.reg.PC) + int32(offset)
@@ -495,9 +499,9 @@ var instructions = [0x100]func(gb *Gameboy){
 		}
 	},
 	0x31: func(gb *Gameboy) {
-		// LD SP, n16
-		fmt.Println("Decoded OPCODE: LD SP, n16")
-		gb.cpu.reg.SP = gb.nextPC16()
+		// LD SP, u16
+		fmt.Println("Decoded OPCODE: LD SP, u16")
+		gb.cpu.setSP(gb.nextPC16())
 	},
 	0x32: func(gb *Gameboy) {
 		// LD [HL-], A
@@ -508,35 +512,35 @@ var instructions = [0x100]func(gb *Gameboy){
 	0x33: func(gb *Gameboy) {
 		// INC SP
 		fmt.Println("Decoded OPCODE: INC SP")
-		gb.cpu.reg.SP++
+		gb.cpu.setSP(gb.cpu.reg.SP + 1)
 	},
 	0x34: func(gb *Gameboy) {
 		// INC [HL]
 		fmt.Println("Decoded OPCODE: INC [HL]")
 		val := gb.mmu.read(gb.cpu.getHL())
-		gb.instrInc(func() { gb.mmu.write(gb.cpu.getHL(), val+1) }, val)
+		gb.instrInc(func(result uint8) { gb.mmu.write(gb.cpu.getHL(), result) }, val)
 	},
 	0x35: func(gb *Gameboy) {
 		// DEC [HL]
 		fmt.Println("Decoded OPCODE: DEC [HL]")
 		val := gb.mmu.read(gb.cpu.getHL())
-		gb.instrDec(func() { gb.mmu.write(gb.cpu.getHL(), val-1) }, val)
+		gb.instrDec(func(result uint8) { gb.mmu.write(gb.cpu.getHL(), result) }, val)
 	},
 	0x36: func(gb *Gameboy) {
-		// LD [HL], n8
-		fmt.Println("Decoded OPCODE: LD [HL], n8")
+		// LD [HL], u8
+		fmt.Println("Decoded OPCODE: LD [HL], u8")
 		gb.mmu.write(gb.cpu.getHL(), gb.nextPC())
 	},
 	0x37: func(gb *Gameboy) {
 		// SCF
 		fmt.Println("Decoded OPCODE: SCF")
-		gb.cpu.setN(false)
-		gb.cpu.setH(false)
-		gb.cpu.setC(true)
+		gb.cpu.setNFlag(false)
+		gb.cpu.setHFlag(false)
+		gb.cpu.setCFlag(true)
 	},
 	0x38: func(gb *Gameboy) {
-		// JR C, e8
-		fmt.Println("Decoded OPCODE: JR C, e8")
+		// JR C, i8
+		fmt.Println("Decoded OPCODE: JR C, i8")
 		offset := int8(gb.nextPC())
 		if gb.cpu.cFlag() {
 			jumpAddress := int32(gb.cpu.reg.PC) + int32(offset)
@@ -552,281 +556,275 @@ var instructions = [0x100]func(gb *Gameboy){
 	0x3A: func(gb *Gameboy) {
 		// LD A, [HL-]
 		fmt.Println("Decoded OPCODE: LD A, [HL-]")
-		gb.cpu.reg.A = gb.mmu.read(gb.cpu.getHL())
+		gb.cpu.setA(gb.mmu.read(gb.cpu.getHL()))
 		gb.cpu.setHL(gb.cpu.getHL() - 1)
 	},
 	0x3B: func(gb *Gameboy) {
 		// DEC SP
 		fmt.Println("Decoded OPCODE: DEC SP")
-		gb.cpu.reg.SP--
+		gb.cpu.setSP(gb.cpu.reg.SP - 1)
 	},
 	0x3C: func(gb *Gameboy) {
 		// INC A
 		fmt.Println("Decoded OPCODE: INC A")
-		gb.instrInc(func() { gb.cpu.reg.A++ }, gb.cpu.reg.A)
+		gb.instrInc(gb.cpu.setA, gb.cpu.reg.A)
 	},
 	0x3D: func(gb *Gameboy) {
 		// DEC A
 		fmt.Println("Decoded OPCODE: DEC A")
-		gb.instrDec(func() { gb.cpu.reg.A-- }, gb.cpu.reg.A)
+		gb.instrDec(gb.cpu.setA, gb.cpu.reg.A)
 	},
 	0x3E: func(gb *Gameboy) {
-		// LD A, n8
-		fmt.Println("Decoded OPCODE: LD A, n8")
-		gb.cpu.reg.A = gb.nextPC()
+		// LD A, u8
+		fmt.Println("Decoded OPCODE: LD A, u8")
+		gb.cpu.setA(gb.nextPC())
 	},
 	0x3F: func(gb *Gameboy) {
 		// CCF
 		fmt.Println("Decoded OPCODE: CCF")
-		gb.cpu.setN(false)
-		gb.cpu.setH(false)
-		gb.cpu.setC(!gb.cpu.cFlag())
+		gb.cpu.setNFlag(false)
+		gb.cpu.setHFlag(false)
+		gb.cpu.setCFlag(!gb.cpu.cFlag())
 	},
 	0x40: func(gb *Gameboy) {
 		// LD B, B
 		fmt.Println("Decoded OPCODE: LD B, B")
-		val := gb.cpu.reg.B
-		gb.cpu.reg.B = val
+		gb.cpu.setB(gb.cpu.reg.B)
 	},
 	0x41: func(gb *Gameboy) {
 		// LD B, C
 		fmt.Println("Decoded OPCODE: LD B, C")
-		gb.cpu.reg.B = gb.cpu.reg.C
+		gb.cpu.setB(gb.cpu.reg.C)
 	},
 	0x42: func(gb *Gameboy) {
 		// LD B, D
 		fmt.Println("Decoded OPCODE: LD B, D")
-		gb.cpu.reg.B = gb.cpu.reg.D
+		gb.cpu.setB(gb.cpu.reg.D)
 	},
 	0x43: func(gb *Gameboy) {
 		// LD B, E
 		fmt.Println("Decoded OPCODE: LD B, E")
-		gb.cpu.reg.B = gb.cpu.reg.E
+		gb.cpu.setB(gb.cpu.reg.E)
 	},
 	0x44: func(gb *Gameboy) {
 		// LD B, H
 		fmt.Println("Decoded OPCODE: LD B, H")
-		gb.cpu.reg.B = gb.cpu.reg.H
+		gb.cpu.setB(gb.cpu.reg.H)
 	},
 	0x45: func(gb *Gameboy) {
 		// LD B, L
 		fmt.Println("Decoded OPCODE: LD B, L")
-		gb.cpu.reg.B = gb.cpu.reg.L
+		gb.cpu.setB(gb.cpu.reg.L)
 	},
 	0x46: func(gb *Gameboy) {
 		// LD B, [HL]
 		fmt.Println("Decoded OPCODE: LD B, [HL]")
-		gb.cpu.reg.B = gb.mmu.read(gb.cpu.getHL())
+		gb.cpu.setB(gb.mmu.read(gb.cpu.getHL()))
 	},
 	0x47: func(gb *Gameboy) {
 		// LD B, A
 		fmt.Println("Decoded OPCODE: LD B, A")
-		gb.cpu.reg.B = gb.cpu.reg.A
+		gb.cpu.setB(gb.cpu.reg.A)
 	},
 	0x48: func(gb *Gameboy) {
 		// LD C, B
 		fmt.Println("Decoded OPCODE: LD C, B")
-		gb.cpu.reg.C = gb.cpu.reg.B
+		gb.cpu.setC(gb.cpu.reg.B)
 	},
 	0x49: func(gb *Gameboy) {
 		// LD C, C
 		fmt.Println("Decoded OPCODE: LD C, C")
-		val := gb.cpu.reg.C
-		gb.cpu.reg.C = val
+		gb.cpu.setC(gb.cpu.reg.C)
 	},
 	0x4A: func(gb *Gameboy) {
 		// LD C, D
 		fmt.Println("Decoded OPCODE: LD C, D")
-		gb.cpu.reg.C = gb.cpu.reg.D
+		gb.cpu.setC(gb.cpu.reg.D)
 	},
 	0x4B: func(gb *Gameboy) {
 		// LD C, E
 		fmt.Println("Decoded OPCODE: LD C, E")
-		gb.cpu.reg.C = gb.cpu.reg.E
+		gb.cpu.setC(gb.cpu.reg.E)
 	},
 	0x4C: func(gb *Gameboy) {
 		// LD C, H
 		fmt.Println("Decoded OPCODE: LD C, H")
-		gb.cpu.reg.C = gb.cpu.reg.H
+		gb.cpu.setC(gb.cpu.reg.H)
 	},
 	0x4D: func(gb *Gameboy) {
 		// LD C, L
 		fmt.Println("Decoded OPCODE: LD C, L")
-		gb.cpu.reg.C = gb.cpu.reg.L
+		gb.cpu.setC(gb.cpu.reg.L)
 	},
 	0x4E: func(gb *Gameboy) {
 		// LD C, [HL]
 		fmt.Println("Decoded OPCODE: LD C, [HL]")
-		gb.cpu.reg.C = gb.mmu.read(gb.cpu.getHL())
+		gb.cpu.setC(gb.mmu.read(gb.cpu.getHL()))
 	},
 	0x4F: func(gb *Gameboy) {
 		// LD C, A
 		fmt.Println("Decoded OPCODE: LD C, A")
-		gb.cpu.reg.C = gb.cpu.reg.A
+		gb.cpu.setC(gb.cpu.reg.A)
 	},
 	0x50: func(gb *Gameboy) {
 		// LD D, B
 		fmt.Println("Decoded OPCODE: LD D, B")
-		gb.cpu.reg.D = gb.cpu.reg.B
+		gb.cpu.setD(gb.cpu.reg.B)
 	},
 	0x51: func(gb *Gameboy) {
 		// LD D, C
 		fmt.Println("Decoded OPCODE: LD D, C")
-		gb.cpu.reg.D = gb.cpu.reg.C
+		gb.cpu.setD(gb.cpu.reg.C)
 	},
 	0x52: func(gb *Gameboy) {
 		// LD D, D
 		fmt.Println("Decoded OPCODE: LD D, D")
-		val := gb.cpu.reg.D
-		gb.cpu.reg.D = val
+		gb.cpu.setD(gb.cpu.reg.D)
 	},
 	0x53: func(gb *Gameboy) {
 		// LD D, E
 		fmt.Println("Decoded OPCODE: LD D, E")
-		gb.cpu.reg.D = gb.cpu.reg.E
+		gb.cpu.setD(gb.cpu.reg.E)
 	},
 	0x54: func(gb *Gameboy) {
 		// LD D, H
 		fmt.Println("Decoded OPCODE: LD D, H")
-		gb.cpu.reg.D = gb.cpu.reg.H
+		gb.cpu.setD(gb.cpu.reg.H)
 	},
 	0x55: func(gb *Gameboy) {
 		// LD D, L
 		fmt.Println("Decoded OPCODE: LD D, L")
-		gb.cpu.reg.D = gb.cpu.reg.L
+		gb.cpu.setD(gb.cpu.reg.L)
 	},
 	0x56: func(gb *Gameboy) {
 		// LD D, [HL]
 		fmt.Println("Decoded OPCODE: LD D, [HL]")
-		gb.cpu.reg.D = gb.mmu.read(gb.cpu.getHL())
+		gb.cpu.setD(gb.mmu.read(gb.cpu.getHL()))
 	},
 	0x57: func(gb *Gameboy) {
 		// LD D, A
 		fmt.Println("Decoded OPCODE: LD D, A")
-		gb.cpu.reg.D = gb.cpu.reg.A
+		gb.cpu.setD(gb.cpu.reg.A)
 	},
 	0x58: func(gb *Gameboy) {
 		// LD E, B
 		fmt.Println("Decoded OPCODE: LD E, B")
-		gb.cpu.reg.E = gb.cpu.reg.B
+		gb.cpu.setE(gb.cpu.reg.B)
 	},
 	0x59: func(gb *Gameboy) {
 		// LD E, C
 		fmt.Println("Decoded OPCODE: LD E, C")
-		gb.cpu.reg.E = gb.cpu.reg.C
+		gb.cpu.setE(gb.cpu.reg.C)
 	},
 	0x5A: func(gb *Gameboy) {
 		// LD E, D
 		fmt.Println("Decoded OPCODE: LD E, D")
-		gb.cpu.reg.E = gb.cpu.reg.D
+		gb.cpu.setE(gb.cpu.reg.D)
 	},
 	0x5B: func(gb *Gameboy) {
 		// LD E, E
 		fmt.Println("Decoded OPCODE: LD E, E")
-		val := gb.cpu.reg.E
-		gb.cpu.reg.E = val
+		gb.cpu.setE(gb.cpu.reg.E)
 	},
 	0x5C: func(gb *Gameboy) {
 		// LD E, H
 		fmt.Println("Decoded OPCODE: LD E, H")
-		gb.cpu.reg.E = gb.cpu.reg.H
+		gb.cpu.setE(gb.cpu.reg.H)
 	},
 	0x5D: func(gb *Gameboy) {
 		// LD E, L
 		fmt.Println("Decoded OPCODE: LD E, L")
-		gb.cpu.reg.E = gb.cpu.reg.L
+		gb.cpu.setE(gb.cpu.reg.L)
 	},
 	0x5E: func(gb *Gameboy) {
 		// LD E, [HL]
 		fmt.Println("Decoded OPCODE: LD E, [HL]")
-		gb.cpu.reg.E = gb.mmu.read(gb.cpu.getHL())
+		gb.cpu.setE(gb.mmu.read(gb.cpu.getHL()))
 	},
 	0x5F: func(gb *Gameboy) {
 		// LD E, A
 		fmt.Println("Decoded OPCODE: LD E, A")
-		gb.cpu.reg.E = gb.cpu.reg.A
+		gb.cpu.setE(gb.cpu.reg.A)
 	},
 	0x60: func(gb *Gameboy) {
 		// LD H, B
 		fmt.Println("Decoded OPCODE: LD H, B")
-		gb.cpu.reg.H = gb.cpu.reg.B
+		gb.cpu.setH(gb.cpu.reg.B)
 	},
 	0x61: func(gb *Gameboy) {
 		// LD H, C
 		fmt.Println("Decoded OPCODE: LD H, C")
-		gb.cpu.reg.H = gb.cpu.reg.C
+		gb.cpu.setH(gb.cpu.reg.C)
 	},
 	0x62: func(gb *Gameboy) {
 		// LD H, D
 		fmt.Println("Decoded OPCODE: LD H, D")
-		gb.cpu.reg.H = gb.cpu.reg.D
+		gb.cpu.setH(gb.cpu.reg.D)
 	},
 	0x63: func(gb *Gameboy) {
 		// LD H, E
 		fmt.Println("Decoded OPCODE: LD H, E")
-		gb.cpu.reg.H = gb.cpu.reg.E
+		gb.cpu.setH(gb.cpu.reg.E)
 	},
 	0x64: func(gb *Gameboy) {
 		// LD H, H
 		fmt.Println("Decoded OPCODE: LD H, H")
-		val := gb.cpu.reg.H
-		gb.cpu.reg.H = val
+		gb.cpu.setH(gb.cpu.reg.H)
 	},
 	0x65: func(gb *Gameboy) {
 		// LD H, L
 		fmt.Println("Decoded OPCODE: LD H, L")
-		gb.cpu.reg.H = gb.cpu.reg.L
+		gb.cpu.setH(gb.cpu.reg.L)
 	},
 	0x66: func(gb *Gameboy) {
 		// LD H, [HL]
 		fmt.Println("Decoded OPCODE: LD H, [HL]")
-		gb.cpu.reg.H = gb.mmu.read(gb.cpu.getHL())
+		gb.cpu.setH(gb.mmu.read(gb.cpu.getHL()))
 	},
 	0x67: func(gb *Gameboy) {
 		// LD H, A
 		fmt.Println("Decoded OPCODE: LD H, A")
-		gb.cpu.reg.H = gb.cpu.reg.A
+		gb.cpu.setH(gb.cpu.reg.A)
 	},
 	0x68: func(gb *Gameboy) {
 		// LD L, B
 		fmt.Println("Decoded OPCODE: LD L, B")
-		gb.cpu.reg.L = gb.cpu.reg.B
+		gb.cpu.setL(gb.cpu.reg.B)
 	},
 	0x69: func(gb *Gameboy) {
 		// LD L, C
 		fmt.Println("Decoded OPCODE: LD L, C")
-		gb.cpu.reg.L = gb.cpu.reg.C
+		gb.cpu.setL(gb.cpu.reg.C)
 	},
 	0x6A: func(gb *Gameboy) {
 		// LD L, D
 		fmt.Println("Decoded OPCODE: LD L, D")
-		gb.cpu.reg.L = gb.cpu.reg.D
+		gb.cpu.setL(gb.cpu.reg.D)
 	},
 	0x6B: func(gb *Gameboy) {
 		// LD L, E
 		fmt.Println("Decoded OPCODE: LD L, E")
-		gb.cpu.reg.L = gb.cpu.reg.E
+		gb.cpu.setL(gb.cpu.reg.E)
 	},
 	0x6C: func(gb *Gameboy) {
 		// LD L, H
 		fmt.Println("Decoded OPCODE: LD L, H")
-		gb.cpu.reg.L = gb.cpu.reg.H
+		gb.cpu.setL(gb.cpu.reg.H)
 	},
 	0x6D: func(gb *Gameboy) {
 		// LD L, L
 		fmt.Println("Decoded OPCODE: LD L, L")
-		val := gb.cpu.reg.L
-		gb.cpu.reg.L = val
+		gb.cpu.setL(gb.cpu.reg.L)
 	},
 	0x6E: func(gb *Gameboy) {
 		// LD L, [HL]
 		fmt.Println("Decoded OPCODE: LD L, [HL]")
-		gb.cpu.reg.L = gb.mmu.read(gb.cpu.getHL())
+		gb.cpu.setL(gb.mmu.read(gb.cpu.getHL()))
 	},
 	0x6F: func(gb *Gameboy) {
 		// LD L, A
 		fmt.Println("Decoded OPCODE: LD L, A")
-		gb.cpu.reg.L = gb.cpu.reg.A
+		gb.cpu.setL(gb.cpu.reg.A)
 	},
 	0x70: func(gb *Gameboy) {
 		// LD [HL], B
@@ -871,43 +869,42 @@ var instructions = [0x100]func(gb *Gameboy){
 	0x78: func(gb *Gameboy) {
 		// LD A, B
 		fmt.Println("Decoded OPCODE: LD A, B")
-		gb.cpu.reg.A = gb.cpu.reg.B
+		gb.cpu.setA(gb.cpu.reg.B)
 	},
 	0x79: func(gb *Gameboy) {
 		// LD A, C
 		fmt.Println("Decoded OPCODE: LD A, C")
-		gb.cpu.reg.A = gb.cpu.reg.C
+		gb.cpu.setA(gb.cpu.reg.C)
 	},
 	0x7A: func(gb *Gameboy) {
 		// LD A, D
 		fmt.Println("Decoded OPCODE: LD A, D")
-		gb.cpu.reg.A = gb.cpu.reg.D
+		gb.cpu.setA(gb.cpu.reg.D)
 	},
 	0x7B: func(gb *Gameboy) {
 		// LD A, E
 		fmt.Println("Decoded OPCODE: LD A, E")
-		gb.cpu.reg.A = gb.cpu.reg.E
+		gb.cpu.setA(gb.cpu.reg.E)
 	},
 	0x7C: func(gb *Gameboy) {
 		// LD A, H
 		fmt.Println("Decoded OPCODE: LD A, H")
-		gb.cpu.reg.A = gb.cpu.reg.H
+		gb.cpu.setA(gb.cpu.reg.H)
 	},
 	0x7D: func(gb *Gameboy) {
 		// LD A, L
 		fmt.Println("Decoded OPCODE: LD A, L")
-		gb.cpu.reg.A = gb.cpu.reg.L
+		gb.cpu.setA(gb.cpu.reg.L)
 	},
 	0x7E: func(gb *Gameboy) {
 		// LD A, [HL]
 		fmt.Println("Decoded OPCODE: LD A, [HL]")
-		gb.cpu.reg.A = gb.mmu.read(gb.cpu.getHL())
+		gb.cpu.setA(gb.mmu.read(gb.cpu.getHL()))
 	},
 	0x7F: func(gb *Gameboy) {
 		// LD A, A
 		fmt.Println("Decoded OPCODE: LD A, A")
-		val := gb.cpu.reg.A
-		gb.cpu.reg.A = val
+		gb.cpu.setA(gb.cpu.reg.A)
 	},
 	0x80: func(gb *Gameboy) {
 		// ADD A, B
@@ -1243,8 +1240,8 @@ var instructions = [0x100]func(gb *Gameboy){
 		gb.cpu.setBC(gb.popStack())
 	},
 	0xC2: func(gb *Gameboy) {
-		// JP NZ, a16
-		fmt.Println("Decoded OPCODE: JP NZ, a16")
+		// JP NZ, u16
+		fmt.Println("Decoded OPCODE: JP NZ, u16")
 		jumpAddress := gb.nextPC16()
 		if !gb.cpu.zFlag() {
 			gb.instrJump(jumpAddress)
@@ -1252,13 +1249,13 @@ var instructions = [0x100]func(gb *Gameboy){
 		}
 	},
 	0xC3: func(gb *Gameboy) {
-		// JP a16
-		fmt.Println("Decoded OPCODE: JP a16")
+		// JP u16
+		fmt.Println("Decoded OPCODE: JP u16")
 		gb.instrJump(gb.nextPC16())
 	},
 	0xC4: func(gb *Gameboy) {
-		// CALL NZ, a16
-		fmt.Println("Decoded OPCODE: CALL NZ, a16")
+		// CALL NZ, u16
+		fmt.Println("Decoded OPCODE: CALL NZ, u16")
 		jumpAddress := gb.nextPC16()
 		if !gb.cpu.zFlag() {
 			gb.instrCall(jumpAddress)
@@ -1271,8 +1268,8 @@ var instructions = [0x100]func(gb *Gameboy){
 		gb.pushStack(gb.cpu.getBC())
 	},
 	0xC6: func(gb *Gameboy) {
-		// ADD A, n8
-		fmt.Println("Decoded OPCODE: ADD A, n8")
+		// ADD A, u8
+		fmt.Println("Decoded OPCODE: ADD A, u8")
 		gb.instrAddA(gb.nextPC(), false)
 	},
 	0xC7: func(gb *Gameboy) {
@@ -1294,8 +1291,8 @@ var instructions = [0x100]func(gb *Gameboy){
 		gb.instrRet()
 	},
 	0xCA: func(gb *Gameboy) {
-		// JP Z, a16
-		fmt.Println("Decoded OPCODE: JP Z, a16")
+		// JP Z, u16
+		fmt.Println("Decoded OPCODE: JP Z, u16")
 		jumpAddress := gb.nextPC16()
 		if gb.cpu.zFlag() {
 			gb.instrJump(jumpAddress)
@@ -1313,8 +1310,8 @@ var instructions = [0x100]func(gb *Gameboy){
 		gb.cbInstructions[cbOpcode]()
 	},
 	0xCC: func(gb *Gameboy) {
-		// CALL Z, a16
-		fmt.Println("Decoded OPCODE: CALL Z, a16")
+		// CALL Z, u16
+		fmt.Println("Decoded OPCODE: CALL Z, u16")
 		jumpAddress := gb.nextPC16()
 		if gb.cpu.zFlag() {
 			gb.instrCall(jumpAddress)
@@ -1322,13 +1319,13 @@ var instructions = [0x100]func(gb *Gameboy){
 		}
 	},
 	0xCD: func(gb *Gameboy) {
-		// CALL a16
-		fmt.Println("Decoded OPCODE: CALL a16")
+		// CALL u16
+		fmt.Println("Decoded OPCODE: CALL u16")
 		gb.instrCall(gb.nextPC16())
 	},
 	0xCE: func(gb *Gameboy) {
-		// ADC A, n8
-		fmt.Println("Decoded OPCODE: ADC A, n8")
+		// ADC A, u8
+		fmt.Println("Decoded OPCODE: ADC A, u8")
 		gb.instrAddA(gb.nextPC(), true)
 	},
 	0xCF: func(gb *Gameboy) {
@@ -1350,8 +1347,8 @@ var instructions = [0x100]func(gb *Gameboy){
 		gb.cpu.setDE(gb.popStack())
 	},
 	0xD2: func(gb *Gameboy) {
-		// JP NC, a16
-		fmt.Println("Decoded OPCODE: JP NC, a16")
+		// JP NC, u16
+		fmt.Println("Decoded OPCODE: JP NC, u16")
 		jumpAddress := gb.nextPC16()
 		if !gb.cpu.cFlag() {
 			gb.instrJump(jumpAddress)
@@ -1363,8 +1360,8 @@ var instructions = [0x100]func(gb *Gameboy){
 		fmt.Println("ILLEGAL OPCODE: 0xD3")
 	},
 	0xD4: func(gb *Gameboy) {
-		// CALL NC, a16
-		fmt.Println("Decoded OPCODE: CALL NC, a16")
+		// CALL NC, u16
+		fmt.Println("Decoded OPCODE: CALL NC, u16")
 		jumpAddress := gb.nextPC16()
 		if !gb.cpu.cFlag() {
 			gb.instrCall(jumpAddress)
@@ -1377,8 +1374,8 @@ var instructions = [0x100]func(gb *Gameboy){
 		gb.pushStack(gb.cpu.getDE())
 	},
 	0xD6: func(gb *Gameboy) {
-		// SUB A, n8
-		fmt.Println("Decoded OPCODE: SUB A, n8")
+		// SUB A, u8
+		fmt.Println("Decoded OPCODE: SUB A, u8")
 		gb.instrSubA(gb.nextPC(), false)
 	},
 	0xD7: func(gb *Gameboy) {
@@ -1401,8 +1398,8 @@ var instructions = [0x100]func(gb *Gameboy){
 		gb.interruptsPendingEnabled = true
 	},
 	0xDA: func(gb *Gameboy) {
-		// JP C, a16
-		fmt.Println("Decoded OPCODE: JP C, a16")
+		// JP C, u16
+		fmt.Println("Decoded OPCODE: JP C, u16")
 		jumpAddress := gb.nextPC16()
 		if gb.cpu.cFlag() {
 			gb.instrJump(jumpAddress)
@@ -1414,8 +1411,8 @@ var instructions = [0x100]func(gb *Gameboy){
 		fmt.Println("ILLEGAL OPCODE: 0xDB")
 	},
 	0xDC: func(gb *Gameboy) {
-		// CALL C, a16
-		fmt.Println("Decoded OPCODE: CALL C, a16")
+		// CALL C, u16
+		fmt.Println("Decoded OPCODE: CALL C, u16")
 		jumpAddress := gb.nextPC16()
 		if gb.cpu.cFlag() {
 			gb.instrCall(jumpAddress)
@@ -1427,8 +1424,8 @@ var instructions = [0x100]func(gb *Gameboy){
 		fmt.Println("ILLEGAL OPCODE: 0xDD")
 	},
 	0xDE: func(gb *Gameboy) {
-		// SBC A, n8
-		fmt.Println("Decoded OPCODE: SBC A, n8")
+		// SBC A, u8
+		fmt.Println("Decoded OPCODE: SBC A, u8")
 		gb.instrSubA(gb.nextPC(), true)
 	},
 	0xDF: func(gb *Gameboy) {
@@ -1437,8 +1434,8 @@ var instructions = [0x100]func(gb *Gameboy){
 		gb.instrCall(0x0018)
 	},
 	0xE0: func(gb *Gameboy) {
-		// LDH [a8], A
-		fmt.Println("Decoded OPCODE: LDH [a8], A")
+		// LD (FF00+u8), A
+		fmt.Println("Decoded OPCODE: LD (FF00+u8), A")
 		address := 0xFF00 + uint16(gb.nextPC())
 		gb.mmu.write(address, gb.cpu.reg.A)
 	},
@@ -1448,8 +1445,8 @@ var instructions = [0x100]func(gb *Gameboy){
 		gb.cpu.setHL(gb.popStack())
 	},
 	0xE2: func(gb *Gameboy) {
-		// LD [C], A
-		fmt.Println("Decoded OPCODE: LD [C], A")
+		// LD (FF00+C), A
+		fmt.Println("Decoded OPCODE: LD (FF00+C), A")
 		address := 0xFF00 + uint16(gb.cpu.reg.C)
 		gb.mmu.write(address, gb.cpu.reg.A)
 	},
@@ -1467,8 +1464,8 @@ var instructions = [0x100]func(gb *Gameboy){
 		gb.pushStack(gb.cpu.getHL())
 	},
 	0xE6: func(gb *Gameboy) {
-		// AND A, n8
-		fmt.Println("Decoded OPCODE: AND A, n8")
+		// AND A, u8
+		fmt.Println("Decoded OPCODE: AND A, u8")
 		gb.instrAndA(gb.nextPC())
 	},
 	0xE7: func(gb *Gameboy) {
@@ -1477,14 +1474,9 @@ var instructions = [0x100]func(gb *Gameboy){
 		gb.instrCall(0x0020)
 	},
 	0xE8: func(gb *Gameboy) {
-		// ADD SP, e8
-		fmt.Println("Decoded OPCODE: ADD SP, e8")
-		gb.instrAdd16Signed(
-			func(result uint16) {
-				gb.cpu.reg.SP = result
-			},
-			gb.cpu.reg.SP,
-			int8(gb.nextPC()))
+		// ADD SP, i8
+		fmt.Println("Decoded OPCODE: ADD SP, i8")
+		gb.instrAdd16Signed(gb.cpu.setSP, gb.cpu.reg.SP, int8(gb.nextPC()))
 	},
 	0xE9: func(gb *Gameboy) {
 		// JP HL
@@ -1492,8 +1484,8 @@ var instructions = [0x100]func(gb *Gameboy){
 		gb.instrJump(gb.cpu.getHL())
 	},
 	0xEA: func(gb *Gameboy) {
-		// LD [a16], A
-		fmt.Println("Decoded OPCODE: LD [a16], A")
+		// LD [u16], A
+		fmt.Println("Decoded OPCODE: LD [u16], A")
 		gb.mmu.write(gb.nextPC16(), gb.cpu.reg.A)
 	},
 	0xEB: func(gb *Gameboy) {
@@ -1509,8 +1501,8 @@ var instructions = [0x100]func(gb *Gameboy){
 		fmt.Println("ILLEGAL OPCODE: 0xED")
 	},
 	0xEE: func(gb *Gameboy) {
-		// XOR A, n8
-		fmt.Println("Decoded OPCODE: XOR A, n8")
+		// XOR A, u8
+		fmt.Println("Decoded OPCODE: XOR A, u8")
 		gb.instrXorA(gb.nextPC())
 	},
 	0xEF: func(gb *Gameboy) {
@@ -1519,10 +1511,10 @@ var instructions = [0x100]func(gb *Gameboy){
 		gb.instrCall(0x0028)
 	},
 	0xF0: func(gb *Gameboy) {
-		// LDH A, [a8]
-		fmt.Println("Decoded OPCODE: LDH A, [a8]")
+		// LD A, (FF00+u8)
+		fmt.Println("Decoded OPCODE: LD A, (FF00+u8)")
 		address := 0xFF00 + uint16(gb.nextPC())
-		gb.cpu.reg.A = gb.mmu.read(address)
+		gb.cpu.setA(gb.mmu.read(address))
 	},
 	0xF1: func(gb *Gameboy) {
 		// POP AF
@@ -1530,10 +1522,10 @@ var instructions = [0x100]func(gb *Gameboy){
 		gb.cpu.setAF(gb.popStack())
 	},
 	0xF2: func(gb *Gameboy) {
-		// LD A, [C]
-		fmt.Println("Decoded OPCODE: LD A, [C]")
+		// LD A, (FF00+C)
+		fmt.Println("Decoded OPCODE: LD A, (FF00+C)")
 		address := 0xFF00 + uint16(gb.cpu.reg.C)
-		gb.cpu.reg.A = gb.mmu.read(address)
+		gb.cpu.setA(gb.mmu.read(address))
 	},
 	0xF3: func(gb *Gameboy) {
 		// DI
@@ -1550,8 +1542,8 @@ var instructions = [0x100]func(gb *Gameboy){
 		gb.pushStack(gb.cpu.getAF())
 	},
 	0xF6: func(gb *Gameboy) {
-		// OR A, n8
-		fmt.Println("Decoded OPCODE: OR A, n8")
+		// OR A, u8
+		fmt.Println("Decoded OPCODE: OR A, u8")
 		gb.instrOrA(gb.nextPC())
 	},
 	0xF7: func(gb *Gameboy) {
@@ -1567,12 +1559,12 @@ var instructions = [0x100]func(gb *Gameboy){
 	0xF9: func(gb *Gameboy) {
 		// LD SP, HL
 		fmt.Println("Decoded OPCODE: LD SP, HL")
-		gb.cpu.reg.SP = gb.cpu.getHL()
+		gb.cpu.setSP(gb.cpu.getHL())
 	},
 	0xFA: func(gb *Gameboy) {
-		// LD A, [a16]
-		fmt.Println("Decoded OPCODE: LD A, [a16]")
-		gb.cpu.reg.A = gb.mmu.read(gb.nextPC16())
+		// LD A, [u16]
+		fmt.Println("Decoded OPCODE: LD A, [u16]")
+		gb.cpu.setA(gb.mmu.read(gb.nextPC16()))
 	},
 	0xFB: func(gb *Gameboy) {
 		// EI
@@ -1588,8 +1580,8 @@ var instructions = [0x100]func(gb *Gameboy){
 		fmt.Println("ILLEGAL OPCODE: 0xFD")
 	},
 	0xFE: func(gb *Gameboy) {
-		// CP A, n8
-		fmt.Println("Decoded OPCODE: CP A, n8")
+		// CP A, u8
+		fmt.Println("Decoded OPCODE: CP A, u8")
 		gb.instrCpA(gb.nextPC())
 	},
 	0xFF: func(gb *Gameboy) {

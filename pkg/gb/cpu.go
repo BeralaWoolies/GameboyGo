@@ -43,6 +43,42 @@ func (cpu *CPU) init() {
 	cpu.reg.PC = 0x100
 }
 
+func (cpu *CPU) setA(val uint8) {
+	cpu.reg.A = val
+}
+
+func (cpu *CPU) setB(val uint8) {
+	cpu.reg.B = val
+}
+
+func (cpu *CPU) setC(val uint8) {
+	cpu.reg.C = val
+}
+
+func (cpu *CPU) setD(val uint8) {
+	cpu.reg.D = val
+}
+
+func (cpu *CPU) setE(val uint8) {
+	cpu.reg.E = val
+}
+
+func (cpu *CPU) setH(val uint8) {
+	cpu.reg.H = val
+}
+
+func (cpu *CPU) setL(val uint8) {
+	cpu.reg.L = val
+}
+
+func (cpu *CPU) setSP(val uint16) {
+	cpu.reg.SP = val
+}
+
+func (cpu *CPU) setPC(val uint16) {
+	cpu.reg.PC = val
+}
+
 func (cpu *CPU) getAF() uint16 {
 	return uint16(cpu.reg.A)<<8 | uint16(cpu.reg.F)
 }
@@ -87,19 +123,19 @@ func (cpu *CPU) setFlag(pos uint8, set bool) {
 	}
 }
 
-func (cpu *CPU) setZ(set bool) {
+func (cpu *CPU) setZFlag(set bool) {
 	cpu.setFlag(zeroFlagBitPos, set)
 }
 
-func (cpu *CPU) setN(set bool) {
+func (cpu *CPU) setNFlag(set bool) {
 	cpu.setFlag(subFlagBitPos, set)
 }
 
-func (cpu *CPU) setH(set bool) {
+func (cpu *CPU) setHFlag(set bool) {
 	cpu.setFlag(halfCarryFlagBitPos, set)
 }
 
-func (cpu *CPU) setC(set bool) {
+func (cpu *CPU) setCFlag(set bool) {
 	cpu.setFlag(carryFlagBitPos, set)
 }
 

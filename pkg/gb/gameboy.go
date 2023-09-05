@@ -53,13 +53,13 @@ func (gb *Gameboy) Start() {
 
 func (gb *Gameboy) step() {
 	opcode := gb.nextPC()
-	opcode = 0x81
-	gb.executeInstr(opcode)
+	opcode = 0x04
+	cycles := gb.executeInstr(opcode)
+	fmt.Printf("Took %d Clock Ticks\n", cycles)
 }
 
 func (gb *Gameboy) executeInstr(opcode uint8) int {
 	fmt.Printf("Executing OPCODE: 0x%02x at PC: 0x%04x\n", opcode, gb.cpu.reg.PC-1)
-	// fmt.Printf("Clock Ticks: %d\n", instrClockTicks[opcode])
 
 	gb.cpu.ticks = instrClockTicks[opcode]
 	instructions[opcode](gb)

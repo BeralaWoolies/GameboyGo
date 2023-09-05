@@ -6,20 +6,20 @@ func (gb *Gameboy) instrRlc(setHandler func(result uint8), val uint8) {
 	result := uint8((val << 1)) | (val >> 7)
 	setHandler(result)
 
-	gb.cpu.setZ(result == 0)
-	gb.cpu.setN(false)
-	gb.cpu.setH(false)
-	gb.cpu.setC(val >= 0x80)
+	gb.cpu.setZFlag(result == 0)
+	gb.cpu.setNFlag(false)
+	gb.cpu.setHFlag(false)
+	gb.cpu.setCFlag(val >= 0x80)
 }
 
 func (gb *Gameboy) instrRrc(setHandler func(result uint8), val uint8) {
 	result := (val >> 1) | ((val & 1) << 7)
 	setHandler(result)
 
-	gb.cpu.setZ(result == 0)
-	gb.cpu.setN(false)
-	gb.cpu.setH(false)
-	gb.cpu.setC(result >= 0x80)
+	gb.cpu.setZFlag(result == 0)
+	gb.cpu.setNFlag(false)
+	gb.cpu.setHFlag(false)
+	gb.cpu.setCFlag(result >= 0x80)
 }
 
 func (gb *Gameboy) instrRl(setHandler func(result uint8), val uint8) {
@@ -31,10 +31,10 @@ func (gb *Gameboy) instrRl(setHandler func(result uint8), val uint8) {
 	result := uint8(val<<1) + carry
 	setHandler(result)
 
-	gb.cpu.setZ(result == 0)
-	gb.cpu.setN(false)
-	gb.cpu.setH(false)
-	gb.cpu.setC(val >= 0x80)
+	gb.cpu.setZFlag(result == 0)
+	gb.cpu.setNFlag(false)
+	gb.cpu.setHFlag(false)
+	gb.cpu.setCFlag(val >= 0x80)
 }
 
 func (gb *Gameboy) instrRr(setHandler func(result uint8), val uint8) {
@@ -46,70 +46,70 @@ func (gb *Gameboy) instrRr(setHandler func(result uint8), val uint8) {
 	result := uint8(val>>1) | carry
 	setHandler(result)
 
-	gb.cpu.setZ(result == 0)
-	gb.cpu.setN(false)
-	gb.cpu.setH(false)
-	gb.cpu.setC((val & 1) == 1)
+	gb.cpu.setZFlag(result == 0)
+	gb.cpu.setNFlag(false)
+	gb.cpu.setHFlag(false)
+	gb.cpu.setCFlag((val & 1) == 1)
 }
 
 func (gb *Gameboy) instrSla(setHandler func(result uint8), val uint8) {
 	result := uint8(val << 1)
 	setHandler(result)
 
-	gb.cpu.setZ(result == 0)
-	gb.cpu.setN(false)
-	gb.cpu.setH(false)
-	gb.cpu.setC(val >= 0x80)
+	gb.cpu.setZFlag(result == 0)
+	gb.cpu.setNFlag(false)
+	gb.cpu.setHFlag(false)
+	gb.cpu.setCFlag(val >= 0x80)
 }
 
 func (gb *Gameboy) instrSra(setHandler func(result uint8), val uint8) {
 	result := (val & 0x80) | (val >> 1)
 	setHandler(result)
 
-	gb.cpu.setZ(result == 0)
-	gb.cpu.setN(false)
-	gb.cpu.setH(false)
-	gb.cpu.setC((val & 1) == 1)
+	gb.cpu.setZFlag(result == 0)
+	gb.cpu.setNFlag(false)
+	gb.cpu.setHFlag(false)
+	gb.cpu.setCFlag((val & 1) == 1)
 }
 
 func (gb *Gameboy) instrSrl(setHandler func(result uint8), val uint8) {
 	result := val >> 1
 	setHandler(result)
 
-	gb.cpu.setZ(result == 0)
-	gb.cpu.setN(false)
-	gb.cpu.setH(false)
-	gb.cpu.setC((val & 1) == 1)
+	gb.cpu.setZFlag(result == 0)
+	gb.cpu.setNFlag(false)
+	gb.cpu.setHFlag(false)
+	gb.cpu.setCFlag((val & 1) == 1)
 }
 
 func (gb *Gameboy) instrSwap(setHandler func(result uint8), val uint8) {
 	result := ((val >> 4) & 0xF) | ((val << 4) & 0xF0)
 	setHandler(result)
 
-	gb.cpu.setZ(result == 0)
-	gb.cpu.setN(false)
-	gb.cpu.setH(false)
-	gb.cpu.setC(false)
+	gb.cpu.setZFlag(result == 0)
+	gb.cpu.setNFlag(false)
+	gb.cpu.setHFlag(false)
+	gb.cpu.setCFlag(false)
 }
 
 func (gb *Gameboy) instrBit(val uint8, pos uint8) {
-	gb.cpu.setZ(((val >> pos) & 1) == 0)
-	gb.cpu.setN(false)
-	gb.cpu.setH(true)
+	gb.cpu.setZFlag((val>>pos)&1 == 0)
+	gb.cpu.setNFlag(false)
+	gb.cpu.setHFlag(true)
 }
 
 func (gb *Gameboy) initCbInstructions() [0x100]func() {
 	instructions := [0x100]func(){}
 
 	setHandlers := [8]func(result uint8){
-		0: func(result uint8) { gb.cpu.reg.B = result },
-		1: func(result uint8) { gb.cpu.reg.C = result },
-		2: func(result uint8) { gb.cpu.reg.D = result },
-		3: func(result uint8) { gb.cpu.reg.E = result },
-		4: func(result uint8) { gb.cpu.reg.H = result },
-		5: func(result uint8) { gb.cpu.reg.L = result },
+		0: gb.cpu.setB,
+		1: gb.cpu.setC,
+		2: gb.cpu.setD,
+		3: gb.cpu.setE,
+		4: gb.cpu.setH,
+		5: gb.cpu.setL,
 		6: func(result uint8) { gb.mmu.write(gb.cpu.getHL(), result) },
-		7: func(result uint8) { gb.cpu.reg.A = result },
+		7: gb.cpu.setA,
 	}
 
 	getHandlers := [8]func() uint8{
