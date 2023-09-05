@@ -1,11 +1,11 @@
 package bits
 
 func Set(val uint8, pos uint8) uint8 {
-	return val | (0x1 << pos)
+	return val | (1 << pos)
 }
 
 func Reset(val uint8, pos uint8) uint8 {
-	return val & ^(0x1 << pos)
+	return val & ^(1 << pos)
 }
 
 func IsHalfCarryAdd(augend uint8, addend uint8) bool {

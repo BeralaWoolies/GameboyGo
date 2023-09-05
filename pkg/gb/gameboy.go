@@ -11,6 +11,7 @@ type Gameboy struct {
 	mmu                      *MMU
 	interruptsOn             bool
 	interruptsPendingEnabled bool
+	cbInstructions           [0x100]func()
 }
 
 func NewGameboy() *Gameboy {
@@ -25,6 +26,8 @@ func (gb *Gameboy) init() {
 
 	gb.mmu = &MMU{}
 	gb.mmu.init()
+
+	gb.cbInstructions = gb.initCbInstructions()
 }
 
 func (gb *Gameboy) printRegisters() {
@@ -43,7 +46,6 @@ func (gb *Gameboy) printRegisters() {
 
 func (gb *Gameboy) Start() {
 	fmt.Printf("Starting gameboy...\n\n")
-
 	fmt.Println("Initial Registers:")
 	gb.printRegisters()
 	gb.step()
@@ -55,15 +57,16 @@ func (gb *Gameboy) step() {
 	gb.executeInstr(opcode)
 }
 
-func (gb *Gameboy) executeInstr(opcode uint8) {
+func (gb *Gameboy) executeInstr(opcode uint8) int {
 	fmt.Printf("Executing OPCODE: 0x%02x at PC: 0x%04x\n", opcode, gb.cpu.reg.PC-1)
 	// fmt.Printf("Clock Ticks: %d\n", instrClockTicks[opcode])
 
+	gb.cpu.ticks = instrClockTicks[opcode]
 	instructions[opcode](gb)
-	gb.cpu.ticks += instrClockTicks[opcode]
 
 	fmt.Println("Registers After: ")
 	gb.printRegisters()
+	return gb.cpu.ticks
 }
 
 func (gb *Gameboy) pushStack(address uint16) {

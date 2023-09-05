@@ -4,7 +4,7 @@ import "github.com/BeralaWoolies/GameboyGo/pkg/bits"
 
 type CPU struct {
 	reg    *Registers
-	ticks  uint64
+	ticks  int
 	halted bool
 }
 
