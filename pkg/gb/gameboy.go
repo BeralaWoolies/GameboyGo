@@ -73,13 +73,13 @@ func (gb *Gameboy) pushStack(address uint16) {
 	gb.mmu.write(gb.cpu.reg.SP-1, bits.HiByte(address))
 	gb.mmu.write(gb.cpu.reg.SP-2, bits.LoByte(address))
 
-	gb.cpu.reg.SP -= 2
+	gb.cpu.setSP(gb.cpu.reg.SP - 2)
 }
 
 func (gb *Gameboy) popStack() uint16 {
 	loByte := gb.mmu.read(gb.cpu.reg.SP)
 	hiByte := gb.mmu.read(gb.cpu.reg.SP + 1)
 
-	gb.cpu.reg.SP += 2
+	gb.cpu.setSP(gb.cpu.reg.SP + 2)
 	return uint16(hiByte)<<8 | uint16(loByte)
 }
