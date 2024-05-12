@@ -41,15 +41,22 @@ func (mmu *MMU) init() {
 	mmu.memory[0xFFFF] = 0x00
 }
 
+func (mmu *MMU) mapRom(bootRom []byte) {
+	copy(mmu.memory[:], bootRom)
+	for _, b := range mmu.memory {
+		fmt.Printf("%02x ", b)
+	}
+}
+
 func (mmu *MMU) read(address uint16) uint8 {
-	if address >= 0x0000 && address <= 0xFFFF {
+	if address <= 0xFFFF {
 		return mmu.memory[address]
 	}
-	return 0
+	return 0xFF
 }
 
 func (mmu *MMU) write(address uint16, data uint8) {
-	if address >= 0x0000 && address <= 0xFFFF {
+	if address <= 0xFFFF {
 		mmu.memory[address] = data
 		fmt.Printf("Write at: [0x%04x] = 0x%02x\n", address, data)
 	}

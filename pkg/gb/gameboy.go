@@ -2,6 +2,8 @@ package gb
 
 import (
 	"fmt"
+	"log"
+	"os"
 
 	"github.com/BeralaWoolies/GameboyGo/pkg/bits"
 )
@@ -14,9 +16,10 @@ type Gameboy struct {
 	cbInstructions           [0x100]func()
 }
 
-func NewGameboy() *Gameboy {
+func NewGameboy(romName string) *Gameboy {
 	gb := &Gameboy{}
 	gb.init()
+	gb.loadRom(romName)
 	return gb
 }
 
@@ -27,7 +30,19 @@ func (gb *Gameboy) init() {
 	gb.mmu = &MMU{}
 	gb.mmu.init()
 
+	gb.interruptsOn = false
+	gb.interruptsPendingEnabled = false
+
 	gb.cbInstructions = gb.initCbInstructions()
+}
+
+func (gb *Gameboy) loadRom(romName string) {
+	rom, err := os.ReadFile(romName)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	gb.mmu.mapRom(rom)
 }
 
 func (gb *Gameboy) printRegisters() {
@@ -46,16 +61,16 @@ func (gb *Gameboy) printRegisters() {
 
 func (gb *Gameboy) Start() {
 	fmt.Printf("Starting gameboy...\n\n")
-	fmt.Println("Initial Registers:")
-	gb.printRegisters()
-	gb.step()
+
+	for !gb.cpu.halted {
+		gb.step()
+	}
 }
 
 func (gb *Gameboy) step() {
 	opcode := gb.nextPC()
-	opcode = 0x04
-	cycles := gb.executeInstr(opcode)
-	fmt.Printf("Took %d Clock Ticks\n", cycles)
+	gb.executeInstr(opcode)
+	// fmt.Printf("Took %d Clock Ticks\n", cycles)
 }
 
 func (gb *Gameboy) executeInstr(opcode uint8) int {
@@ -64,8 +79,8 @@ func (gb *Gameboy) executeInstr(opcode uint8) int {
 	gb.cpu.ticks = instrClockTicks[opcode]
 	instructions[opcode](gb)
 
-	fmt.Println("Registers After: ")
-	gb.printRegisters()
+	// fmt.Println("Registers After: ")
+	// gb.printRegisters()
 	return gb.cpu.ticks
 }
 

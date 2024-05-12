@@ -181,7 +181,6 @@ var instructions = [0x100]func(gb *Gameboy){
 	0x00: func(gb *Gameboy) {
 		// NOP
 		fmt.Println("Decoded OPCODE: NOP")
-		return
 	},
 	0x01: func(gb *Gameboy) {
 		// LD BC, u16

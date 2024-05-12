@@ -85,7 +85,7 @@ func (cpu *CPU) getAF() uint16 {
 
 func (cpu *CPU) setAF(val uint16) {
 	cpu.reg.A = bits.HiByte(val)
-	cpu.reg.F = bits.LoByte(val)
+	cpu.reg.F = bits.LoByte(val) & 0xF0
 }
 
 func (cpu *CPU) getBC() uint16 {
