@@ -3,9 +3,11 @@ package gb
 import "github.com/BeralaWoolies/GameboyGo/pkg/bits"
 
 type CPU struct {
-	reg    *Registers
-	ticks  int
-	halted bool
+	reg      *Registers
+	ticks    int
+	halted   bool
+	IME      bool
+	IMEDelay bool
 }
 
 type Registers struct {
@@ -41,6 +43,11 @@ func (cpu *CPU) init() {
 	cpu.reg.L = 0x4D
 	cpu.reg.SP = 0xFFFE
 	cpu.reg.PC = 0x100
+
+	cpu.ticks = 0
+	cpu.halted = false
+	cpu.IME = false
+	cpu.IMEDelay = false
 }
 
 func (cpu *CPU) setA(val uint8) {
@@ -153,4 +160,28 @@ func (cpu *CPU) hFlag() bool {
 
 func (cpu *CPU) cFlag() bool {
 	return (cpu.reg.F>>carryFlagBitPos)&1 == 1
+}
+
+func (cpu *CPU) setIME() {
+	cpu.IME = true
+}
+
+func (cpu *CPU) clearIME() {
+	cpu.IME = false
+}
+
+func (cpu *CPU) setIMEDelay() {
+	cpu.IMEDelay = true
+}
+
+func (cpu *CPU) clearIMEDelay() {
+	cpu.IMEDelay = false
+}
+
+func (cpu *CPU) enterHaltedState() {
+	cpu.halted = true
+}
+
+func (cpu *CPU) exitHaltedState() {
+	cpu.halted = false
 }
