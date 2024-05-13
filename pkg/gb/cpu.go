@@ -24,10 +24,10 @@ type Registers struct {
 }
 
 const (
-	zeroFlagBitPos      = 7
-	subFlagBitPos       = 6
-	halfCarryFlagBitPos = 5
-	carryFlagBitPos     = 4
+	ZERO_FLAG_BIT       = 7
+	SUB_FLAG_BIT        = 6
+	HALF_CARRY_FLAG_BIT = 5
+	CARRY_FLAG_BIT      = 4
 )
 
 func (cpu *CPU) init() {
@@ -131,35 +131,35 @@ func (cpu *CPU) setFlag(pos uint8, set bool) {
 }
 
 func (cpu *CPU) setZFlag(set bool) {
-	cpu.setFlag(zeroFlagBitPos, set)
+	cpu.setFlag(ZERO_FLAG_BIT, set)
 }
 
 func (cpu *CPU) setNFlag(set bool) {
-	cpu.setFlag(subFlagBitPos, set)
+	cpu.setFlag(SUB_FLAG_BIT, set)
 }
 
 func (cpu *CPU) setHFlag(set bool) {
-	cpu.setFlag(halfCarryFlagBitPos, set)
+	cpu.setFlag(HALF_CARRY_FLAG_BIT, set)
 }
 
 func (cpu *CPU) setCFlag(set bool) {
-	cpu.setFlag(carryFlagBitPos, set)
+	cpu.setFlag(CARRY_FLAG_BIT, set)
 }
 
 func (cpu *CPU) zFlag() bool {
-	return (cpu.reg.F>>zeroFlagBitPos)&1 == 1
+	return (cpu.reg.F>>ZERO_FLAG_BIT)&1 == 1
 }
 
 func (cpu *CPU) nFlag() bool {
-	return (cpu.reg.F>>subFlagBitPos)&1 == 1
+	return (cpu.reg.F>>SUB_FLAG_BIT)&1 == 1
 }
 
 func (cpu *CPU) hFlag() bool {
-	return (cpu.reg.F>>halfCarryFlagBitPos)&1 == 1
+	return (cpu.reg.F>>HALF_CARRY_FLAG_BIT)&1 == 1
 }
 
 func (cpu *CPU) cFlag() bool {
-	return (cpu.reg.F>>carryFlagBitPos)&1 == 1
+	return (cpu.reg.F>>CARRY_FLAG_BIT)&1 == 1
 }
 
 func (cpu *CPU) setIME() {

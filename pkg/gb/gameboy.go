@@ -2,8 +2,6 @@ package gb
 
 import (
 	"fmt"
-	"log"
-	"os"
 
 	"github.com/BeralaWoolies/GameboyGo/pkg/bits"
 )
@@ -11,43 +9,50 @@ import (
 type Gameboy struct {
 	cpu            *CPU
 	mmu            *MMU
+	timer          *Timer
 	cbInstructions [0x100]func()
 	stopped        bool
 }
 
 const (
-	CLOCK_SPEED           = 4194304
-	FPS                   = 60
-	CLOCK_TICKS_PER_FRAME = CLOCK_SPEED / FPS
+	CLOCK_SPEED       = 4194304
+	FPS               = 60
+	C_TICKS_PER_FRAME = CLOCK_SPEED / FPS
 
 	ISR_CLOCK_TICKS = 20
 )
 
-func NewGameboy(romName string) *Gameboy {
+func NewGameboy(filename string) *Gameboy {
 	gb := &Gameboy{}
-	gb.init()
-	gb.loadRom(romName)
+	gb.init(filename)
 	return gb
 }
 
-func (gb *Gameboy) init() {
+func (gb *Gameboy) init(filename string) {
 	gb.cpu = &CPU{}
 	gb.cpu.init()
 
 	gb.mmu = &MMU{}
-	gb.mmu.init()
+
+	gb.timer = &Timer{}
+	gb.timer.init(gb.mmu)
 
 	gb.cbInstructions = gb.initCbInstructions()
 	gb.stopped = false
+
+	gb.initMemoryMap(filename)
 }
 
-func (gb *Gameboy) loadRom(romName string) {
-	rom, err := os.ReadFile(romName)
-	if err != nil {
-		log.Fatal(err)
-	}
+func (gb *Gameboy) initMemoryMap(filename string) {
+	gb.mmu.mapAddrSpace(newBootROM("boot_rom.bin", gb.mmu))
+	gb.mmu.mapAddrSpace(newROM(filename))
+	gb.mmu.mapAddrSpace(gb.timer)
 
-	gb.mmu.mapRom(rom)
+	// for now have our generic RAM be last in precedence to "catch" unimplemented addresses
+	gb.mmu.mapAddrSpace(newGenericRAM())
+
+	// manually disable boot rom for now
+	gb.mmu.write(BOOT_ROM_ENABLE_ADDR, 1)
 }
 
 func (gb *Gameboy) printRegisters() {
@@ -67,16 +72,22 @@ func (gb *Gameboy) printRegisters() {
 func (gb *Gameboy) Start() {
 	fmt.Printf("Starting gameboy...\n\n")
 
-	clockTicks := 0
-	for clockTicks < CLOCK_TICKS_PER_FRAME || !gb.stopped {
-		ticks := 4
+	for !gb.stopped {
+		gb.update()
+	}
+}
+
+func (gb *Gameboy) update() {
+	cTicksInUpdate := 0
+	for cTicksInUpdate < C_TICKS_PER_FRAME {
+		cTicks := 4
 		if !gb.cpu.halted {
-			ticks = gb.stepCPU()
+			cTicks = gb.stepCPU()
 		}
 
-		clockTicks += ticks
-		gb.stepTimer(ticks)
-		clockTicks += gb.handleIntrupts()
+		cTicksInUpdate += cTicks
+		gb.timer.step(cTicks)
+		cTicksInUpdate += gb.handleIntrupts()
 	}
 }
 
@@ -88,16 +99,17 @@ func (gb *Gameboy) stepCPU() int {
 func (gb *Gameboy) executeInstr(opcode uint8) int {
 	// fmt.Printf("Executing OPCODE: 0x%02x at PC: 0x%04x\n", opcode, gb.cpu.reg.PC-1)
 	instructions[opcode](gb)
-	gb.cpu.ticks += instrClockTicks[opcode]
+	cTicks := instrClockTicks[opcode]
+	gb.cpu.ticks += cTicks
 
 	// fmt.Println("Registers After: ")
 	// gb.printRegisters()
-	return instrClockTicks[opcode]
+	return cTicks
 }
 
-func (gb *Gameboy) pushStack(address uint16) {
-	gb.mmu.write(gb.cpu.reg.SP-1, bits.HiByte(address))
-	gb.mmu.write(gb.cpu.reg.SP-2, bits.LoByte(address))
+func (gb *Gameboy) pushStack(addr uint16) {
+	gb.mmu.write(gb.cpu.reg.SP-1, bits.HiByte(addr))
+	gb.mmu.write(gb.cpu.reg.SP-2, bits.LoByte(addr))
 
 	gb.cpu.setSP(gb.cpu.reg.SP - 2)
 }
@@ -176,69 +188,4 @@ func (gb *Gameboy) readIE() uint8 {
 
 func (gb *Gameboy) readIF() uint8 {
 	return gb.mmu.read(IF_ADDR)
-}
-
-func (gb *Gameboy) stepTimer(clockTicks int) {
-	gb.stepDIV(clockTicks)
-	if gb.timerEnabled() {
-		gb.stepTIMA(clockTicks)
-	}
-}
-
-func (gb *Gameboy) stepDIV(clockTicks int) {
-	gb.mmu.DIVTicks += clockTicks
-	if gb.mmu.DIVTicks >= 256 {
-		gb.mmu.DIVTicks -= 256
-		gb.mmu.incDIV()
-	}
-}
-
-func (gb *Gameboy) stepTIMA(clockTicks int) {
-	gb.mmu.TIMATicks += clockTicks
-
-	ovflowTicks := 0
-	switch freqDiv := gb.readTAC() & TAC_FREQ_DIV_MSK; freqDiv {
-	case HZ_4096:
-		ovflowTicks = 1024
-	case HZ_262144:
-		ovflowTicks = 16
-	case HZ_65536:
-		ovflowTicks = 64
-	case HZ_16386:
-		ovflowTicks = 256
-	}
-
-	for gb.mmu.TIMATicks >= ovflowTicks {
-		gb.mmu.TIMATicks -= ovflowTicks
-		gb.writeTIMA(gb.readTIMA() + 1)
-
-		if gb.readTIMA() == 0x00 {
-			gb.requestIntrupt(TIMER_INTRUPT_BIT)
-			gb.writeTIMA(gb.readTMA())
-		}
-	}
-}
-
-func (gb *Gameboy) timerEnabled() bool {
-	return bits.IsSet(gb.readTAC(), TAC_TIMER_ENABLE_BIT)
-}
-
-func (gb *Gameboy) requestIntrupt(intruptBit uint8) {
-	gb.mmu.write(IF_ADDR, bits.Set(gb.readIF(), intruptBit))
-}
-
-func (gb *Gameboy) writeTIMA(val uint8) {
-	gb.mmu.write(TIMA_ADDR, val)
-}
-
-func (gb *Gameboy) readTIMA() uint8 {
-	return gb.mmu.read(TIMA_ADDR)
-}
-
-func (gb *Gameboy) readTMA() uint8 {
-	return gb.mmu.read(TMA_ADDR)
-}
-
-func (gb *Gameboy) readTAC() uint8 {
-	return gb.mmu.read(TAC_ADDR)
 }
