@@ -3,11 +3,13 @@ package gb
 import "github.com/BeralaWoolies/GameboyGo/pkg/bits"
 
 type CPU struct {
-	reg      *Registers
-	ticks    int
-	halted   bool
-	IME      bool
-	IMEDelay bool
+	reg            *Registers
+	mmu            *MMU
+	cbInstructions [0x100]func()
+	ticks          int
+	halted         bool
+	IME            bool
+	IMEDelay       bool
 }
 
 type Registers struct {
@@ -30,8 +32,10 @@ const (
 	CARRY_FLAG_BIT      = 4
 )
 
-func (cpu *CPU) init() {
+func (cpu *CPU) init(mmu *MMU) {
 	cpu.reg = &Registers{}
+	cpu.mmu = mmu
+	cpu.cbInstructions = cpu.initCbInstructions()
 
 	cpu.reg.A = 0x01
 	cpu.reg.B = 0x00
@@ -48,6 +52,49 @@ func (cpu *CPU) init() {
 	cpu.halted = false
 	cpu.IME = false
 	cpu.IMEDelay = false
+}
+
+func (cpu *CPU) step() int {
+	opcode := cpu.nextPC()
+	return cpu.executeInstr(opcode)
+}
+
+func (cpu *CPU) executeInstr(opcode uint8) int {
+	// fmt.Printf("Executing OPCODE: 0x%02x at PC: 0x%04x\n", opcode, gb.cpu.reg.PC-1)
+	instructions[opcode](cpu)
+	cTicks := instrClockTicks[opcode]
+	cpu.ticks += cTicks
+
+	// fmt.Println("Registers After: ")
+	// gb.printRegisters()
+	return cTicks
+}
+
+func (cpu *CPU) pushStack(addr uint16) {
+	cpu.mmu.write(cpu.reg.SP-1, bits.HiByte(addr))
+	cpu.mmu.write(cpu.reg.SP-2, bits.LoByte(addr))
+
+	cpu.setSP(cpu.reg.SP - 2)
+}
+
+func (cpu *CPU) popStack() uint16 {
+	loByte := cpu.mmu.read(cpu.reg.SP)
+	hiByte := cpu.mmu.read(cpu.reg.SP + 1)
+
+	cpu.setSP(cpu.reg.SP + 2)
+	return uint16(hiByte)<<8 | uint16(loByte)
+}
+
+func (cpu *CPU) nextPC() uint8 {
+	data := cpu.mmu.read(cpu.reg.PC)
+	cpu.reg.PC++
+	return data
+}
+
+func (cpu *CPU) nextPC16() uint16 {
+	loByte := cpu.nextPC()
+	hiByte := cpu.nextPC()
+	return uint16(hiByte)<<8 | uint16(loByte)
 }
 
 func (cpu *CPU) setA(val uint8) {

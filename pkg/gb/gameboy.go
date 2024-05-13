@@ -7,11 +7,10 @@ import (
 )
 
 type Gameboy struct {
-	cpu            *CPU
-	mmu            *MMU
-	timer          *Timer
-	cbInstructions [0x100]func()
-	stopped        bool
+	cpu     *CPU
+	mmu     *MMU
+	timer   *Timer
+	stopped bool
 }
 
 const (
@@ -29,17 +28,15 @@ func NewGameboy(filename string) *Gameboy {
 }
 
 func (gb *Gameboy) init(filename string) {
-	gb.cpu = &CPU{}
-	gb.cpu.init()
-
 	gb.mmu = &MMU{}
+
+	gb.cpu = &CPU{}
+	gb.cpu.init(gb.mmu)
 
 	gb.timer = &Timer{}
 	gb.timer.init(gb.mmu)
 
-	gb.cbInstructions = gb.initCbInstructions()
 	gb.stopped = false
-
 	gb.initMemoryMap(filename)
 }
 
@@ -82,44 +79,13 @@ func (gb *Gameboy) update() {
 	for cTicksInUpdate < C_TICKS_PER_FRAME {
 		cTicks := 4
 		if !gb.cpu.halted {
-			cTicks = gb.stepCPU()
+			cTicks = gb.cpu.step()
 		}
 
 		cTicksInUpdate += cTicks
 		gb.timer.step(cTicks)
 		cTicksInUpdate += gb.handleIntrupts()
 	}
-}
-
-func (gb *Gameboy) stepCPU() int {
-	opcode := gb.nextPC()
-	return gb.executeInstr(opcode)
-}
-
-func (gb *Gameboy) executeInstr(opcode uint8) int {
-	// fmt.Printf("Executing OPCODE: 0x%02x at PC: 0x%04x\n", opcode, gb.cpu.reg.PC-1)
-	instructions[opcode](gb)
-	cTicks := instrClockTicks[opcode]
-	gb.cpu.ticks += cTicks
-
-	// fmt.Println("Registers After: ")
-	// gb.printRegisters()
-	return cTicks
-}
-
-func (gb *Gameboy) pushStack(addr uint16) {
-	gb.mmu.write(gb.cpu.reg.SP-1, bits.HiByte(addr))
-	gb.mmu.write(gb.cpu.reg.SP-2, bits.LoByte(addr))
-
-	gb.cpu.setSP(gb.cpu.reg.SP - 2)
-}
-
-func (gb *Gameboy) popStack() uint16 {
-	loByte := gb.mmu.read(gb.cpu.reg.SP)
-	hiByte := gb.mmu.read(gb.cpu.reg.SP + 1)
-
-	gb.cpu.setSP(gb.cpu.reg.SP + 2)
-	return uint16(hiByte)<<8 | uint16(loByte)
 }
 
 func (gb *Gameboy) handleIntrupts() int {
@@ -162,7 +128,7 @@ func (gb *Gameboy) serviceIntrupt(intruptBit uint8) {
 	gb.cpu.exitHaltedState()
 	gb.cpu.clearIME()
 	gb.clearIFBit(intruptBit)
-	gb.pushStack(gb.cpu.reg.PC)
+	gb.cpu.pushStack(gb.cpu.reg.PC)
 
 	switch intruptBit {
 	case VBLANK_INTRUPT_BIT:
