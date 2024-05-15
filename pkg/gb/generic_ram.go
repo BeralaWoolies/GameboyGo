@@ -3,7 +3,8 @@ package gb
 import "fmt"
 
 type GenericRAM struct {
-	memory [0x8000]uint8 // generic ram that covers 0x8000 - 0xFFFF
+	memory [RAM_SIZE]uint8 // generic ram that covers 0xA000 - 0xFFFF
+	ly     uint8
 }
 
 const (
@@ -22,6 +23,10 @@ const (
 	TIMER_INTRUPT_VEC  = 0x50
 	SERIAL_INTRUPT_VEC = 0x58
 	JOYPAD_INTRUPT_VEC = 0x60
+
+	RAM_SIZE = 0x6000
+	RAM_BASE = 0xA000
+	RAM_TOP  = 0xFFFF
 )
 
 func newGenericRAM() *GenericRAM {
@@ -32,49 +37,53 @@ func newGenericRAM() *GenericRAM {
 }
 
 func (r *GenericRAM) init() {
-	r.memory = [0x8000]uint8{}
-	r.memory[0xFF10-0x8000] = 0x80
-	r.memory[0xFF11-0x8000] = 0xBF
-	r.memory[0xFF12-0x8000] = 0xF3
-	r.memory[0xFF14-0x8000] = 0xBF
-	r.memory[0xFF16-0x8000] = 0x3F
-	r.memory[0xFF17-0x8000] = 0x00
-	r.memory[0xFF19-0x8000] = 0xBF
-	r.memory[0xFF1A-0x8000] = 0x7F
-	r.memory[0xFF1B-0x8000] = 0xFF
-	r.memory[0xFF1C-0x8000] = 0x9F
-	r.memory[0xFF1E-0x8000] = 0xBF
-	r.memory[0xFF20-0x8000] = 0xFF
-	r.memory[0xFF21-0x8000] = 0x00
-	r.memory[0xFF22-0x8000] = 0x00
-	r.memory[0xFF23-0x8000] = 0xBF
-	r.memory[0xFF24-0x8000] = 0x77
-	r.memory[0xFF25-0x8000] = 0xF3
-	r.memory[0xFF26-0x8000] = 0xF1
-	r.memory[0xFF40-0x8000] = 0x91
-	r.memory[0xFF42-0x8000] = 0x00
-	r.memory[0xFF43-0x8000] = 0x00
-	r.memory[0xFF45-0x8000] = 0x00
-	r.memory[0xFF47-0x8000] = 0xFC
-	r.memory[0xFF48-0x8000] = 0xFF
-	r.memory[0xFF49-0x8000] = 0xFF
-	r.memory[0xFF4A-0x8000] = 0x00
-	r.memory[0xFF4B-0x8000] = 0x00
-	r.memory[IE_ADDR-0x8000] = 0x00
+	r.memory = [RAM_SIZE]uint8{}
+	r.memory[0xFF10-RAM_BASE] = 0x80
+	r.memory[0xFF11-RAM_BASE] = 0xBF
+	r.memory[0xFF12-RAM_BASE] = 0xF3
+	r.memory[0xFF14-RAM_BASE] = 0xBF
+	r.memory[0xFF16-RAM_BASE] = 0x3F
+	r.memory[0xFF17-RAM_BASE] = 0x00
+	r.memory[0xFF19-RAM_BASE] = 0xBF
+	r.memory[0xFF1A-RAM_BASE] = 0x7F
+	r.memory[0xFF1B-RAM_BASE] = 0xFF
+	r.memory[0xFF1C-RAM_BASE] = 0x9F
+	r.memory[0xFF1E-RAM_BASE] = 0xBF
+	r.memory[0xFF20-RAM_BASE] = 0xFF
+	r.memory[0xFF21-RAM_BASE] = 0x00
+	r.memory[0xFF22-RAM_BASE] = 0x00
+	r.memory[0xFF23-RAM_BASE] = 0xBF
+	r.memory[0xFF24-RAM_BASE] = 0x77
+	r.memory[0xFF25-RAM_BASE] = 0xF3
+	r.memory[0xFF26-RAM_BASE] = 0xF1
+	r.memory[0xFF40-RAM_BASE] = 0x91
+	r.memory[0xFF42-RAM_BASE] = 0x00
+	r.memory[0xFF43-RAM_BASE] = 0x00
+	r.memory[0xFF45-RAM_BASE] = 0x00
+	r.memory[0xFF47-RAM_BASE] = 0xFC
+	r.memory[0xFF48-RAM_BASE] = 0xFF
+	r.memory[0xFF49-RAM_BASE] = 0xFF
+	r.memory[0xFF4A-RAM_BASE] = 0x00
+	r.memory[0xFF4B-RAM_BASE] = 0x00
+	r.memory[IE_ADDR-RAM_BASE] = 0x00
 }
 
 func (r *GenericRAM) contains(addr uint16) bool {
-	return addr >= 8000 && addr <= 0xFFFF
+	return inRange(addr, RAM_BASE, RAM_TOP)
 }
 
 func (r *GenericRAM) read(addr uint16) uint8 {
 	switch addr {
+	case 0xFF44:
+		res := r.ly
+		r.ly++
+		return res
 	case IF_ADDR:
-		return r.memory[addr-0x8000] & INTRUPT_MSK
+		return r.memory[addr-RAM_BASE] & INTRUPT_MSK
 	case IE_ADDR:
-		return r.memory[addr-0x8000] & INTRUPT_MSK
+		return r.memory[addr-RAM_BASE] & INTRUPT_MSK
 	default:
-		return r.memory[addr-0x8000]
+		return r.memory[addr-RAM_BASE]
 	}
 }
 
@@ -86,10 +95,10 @@ func (r *GenericRAM) write(addr uint16, data uint8) {
 
 	switch addr {
 	case IF_ADDR:
-		r.memory[addr-0x8000] = data & INTRUPT_MSK
+		r.memory[addr-RAM_BASE] = data & INTRUPT_MSK
 	case IE_ADDR:
-		r.memory[addr-0x8000] = data & INTRUPT_MSK
+		r.memory[addr-RAM_BASE] = data & INTRUPT_MSK
 	default:
-		r.memory[addr-0x8000] = data
+		r.memory[addr-RAM_BASE] = data
 	}
 }
