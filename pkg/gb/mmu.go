@@ -54,3 +54,7 @@ func (mmu *MMU) write(addr uint16, data uint8) {
 
 	log.Fatalf("MMU has no mapping write address: 0x%02x", addr)
 }
+
+func inRange(addr uint16, base uint16, top uint16) bool {
+	return addr >= base && addr <= top
+}
