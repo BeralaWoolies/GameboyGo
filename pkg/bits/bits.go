@@ -23,3 +23,7 @@ func IsSetInBoth(val1 uint8, val2 uint8, pos uint8) bool {
 func IsSet(val uint8, pos uint8) bool {
 	return val&(1<<pos) != 0
 }
+
+func GetBit(val uint8, pos uint8) uint8 {
+	return (val & (1 << pos)) >> pos
+}

@@ -2,21 +2,36 @@ package gb
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/BeralaWoolies/GameboyGo/pkg/bits"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 type Gameboy struct {
-	cpu     *CPU
-	mmu     *MMU
-	timer   *Timer
-	stopped bool
+	mmu   *MMU
+	cpu   *CPU
+	ppu   *PPU
+	dmac  *DMAC
+	timer *Timer
 }
 
 const (
 	CLOCK_SPEED       = 4194304
 	FPS               = 60
 	C_TICKS_PER_FRAME = CLOCK_SPEED / FPS
+
+	SCREEN_WIDTH  = GB_SCREEN_WIDTH + DEBUG_SCREEN_WIDTH
+	SCREEN_HEIGHT = max(GB_SCREEN_HEIGHT, DEBUG_SCREEN_HEIGHT)
+
+	GB_SCREEN_WIDTH  = 160
+	GB_SCREEN_HEIGHT = 144
+
+	DEBUG_SCREEN_WIDTH  = 128
+	DEBUG_SCREEN_HEIGHT = 192
+
+	WINDOW_WIDTH  = SCREEN_WIDTH * 3
+	WINDOW_HEIGHT = SCREEN_HEIGHT * 3
 
 	ISR_CLOCK_TICKS = 20
 )
@@ -28,21 +43,28 @@ func NewGameboy(filename string) *Gameboy {
 }
 
 func (gb *Gameboy) init(filename string) {
-	gb.mmu = &MMU{}
-
-	gb.cpu = &CPU{}
-	gb.cpu.init(gb.mmu)
-
-	gb.timer = &Timer{}
-	gb.timer.init(gb.mmu)
-
-	gb.stopped = false
+	gb.initHardware()
 	gb.initMemoryMap(filename)
+}
+
+func (gb *Gameboy) initHardware() {
+	gb.mmu = &MMU{}
+	gb.cpu = &CPU{}
+	gb.ppu = &PPU{}
+	gb.dmac = &DMAC{}
+	gb.timer = &Timer{}
+
+	gb.cpu.init(gb.mmu)
+	gb.ppu.init(gb.mmu)
+	gb.dmac.init(gb.mmu)
+	gb.timer.init(gb.mmu)
 }
 
 func (gb *Gameboy) initMemoryMap(filename string) {
 	gb.mmu.mapAddrSpace(newBootROM("boot_rom.bin", gb.mmu))
 	gb.mmu.mapAddrSpace(newROM(filename))
+	gb.mmu.mapAddrSpace(gb.ppu)
+	gb.mmu.mapAddrSpace(gb.dmac)
 	gb.mmu.mapAddrSpace(gb.timer)
 
 	// for now have our generic RAM be last in precedence to "catch" unimplemented addresses
@@ -67,25 +89,37 @@ func (gb *Gameboy) printRegisters() {
 }
 
 func (gb *Gameboy) Start() {
-	fmt.Printf("Starting gameboy...\n\n")
+	ebiten.SetWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT)
+	ebiten.SetWindowTitle("GameboyGo")
+	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
-	for !gb.stopped {
-		gb.update()
+	if err := ebiten.RunGame(gb); err != nil {
+		log.Fatal(err)
 	}
 }
 
-func (gb *Gameboy) update() {
-	cTicksInUpdate := 0
-	for cTicksInUpdate < C_TICKS_PER_FRAME {
+func (gb *Gameboy) Update() error {
+	for cTicksThisUpdate := 0; cTicksThisUpdate < C_TICKS_PER_FRAME; {
 		cTicks := 4
 		if !gb.cpu.halted {
 			cTicks = gb.cpu.step()
 		}
 
-		cTicksInUpdate += cTicks
+		cTicksThisUpdate += cTicks
 		gb.timer.step(cTicks)
-		cTicksInUpdate += gb.handleIntrupts()
+		gb.dmac.step(cTicks)
+		cTicksThisUpdate += gb.handleIntrupts()
 	}
+
+	return nil
+}
+
+func (gb *Gameboy) Draw(screen *ebiten.Image) {
+	gb.ppu.updateDebugScreen(screen, GB_SCREEN_WIDTH, 0)
+}
+
+func (gb *Gameboy) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
+	return SCREEN_WIDTH, SCREEN_HEIGHT
 }
 
 func (gb *Gameboy) handleIntrupts() int {
