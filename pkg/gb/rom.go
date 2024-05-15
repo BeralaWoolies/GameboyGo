@@ -6,8 +6,14 @@ import (
 )
 
 type ROM struct {
-	rom [0x8000]byte
+	rom [ROM_SIZE]byte
 }
+
+const (
+	ROM_SIZE = 0x8000
+	ROM_BASE = 0x0
+	ROM_TOP  = 0x7FFF
+)
 
 func newROM(filename string) *ROM {
 	r := &ROM{}
@@ -22,7 +28,7 @@ func newROM(filename string) *ROM {
 }
 
 func (r *ROM) contains(addr uint16) bool {
-	return addr <= 0x7FFF
+	return inRange(addr, ROM_BASE, ROM_TOP)
 }
 
 func (r *ROM) read(addr uint16) uint8 {
