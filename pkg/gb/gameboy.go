@@ -55,7 +55,7 @@ func (gb *Gameboy) initHardware() {
 	gb.timer = &Timer{}
 
 	gb.cpu.init(gb.mmu)
-	gb.ppu.init(gb.mmu)
+	gb.ppu.init(gb.mmu, gb.dmac)
 	gb.dmac.init(gb.mmu)
 	gb.timer.init(gb.mmu)
 }
@@ -64,7 +64,6 @@ func (gb *Gameboy) initMemoryMap(filename string) {
 	gb.mmu.mapAddrSpace(newBootROM("boot_rom.bin", gb.mmu))
 	gb.mmu.mapAddrSpace(newROM(filename))
 	gb.mmu.mapAddrSpace(gb.ppu)
-	gb.mmu.mapAddrSpace(gb.dmac)
 	gb.mmu.mapAddrSpace(gb.timer)
 
 	// for now have our generic RAM be last in precedence to "catch" unimplemented addresses

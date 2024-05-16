@@ -4,7 +4,6 @@ import "fmt"
 
 type GenericRAM struct {
 	memory [RAM_SIZE]uint8 // generic ram that covers 0xA000 - 0xFFFF
-	ly     uint8
 }
 
 const (
@@ -74,10 +73,6 @@ func (r *GenericRAM) contains(addr uint16) bool {
 
 func (r *GenericRAM) read(addr uint16) uint8 {
 	switch addr {
-	case 0xFF44:
-		res := r.ly
-		r.ly++
-		return res
 	case IF_ADDR:
 		return r.memory[addr-RAM_BASE] & INTRUPT_MSK
 	case IE_ADDR:

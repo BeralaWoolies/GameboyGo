@@ -12,7 +12,20 @@ type PPU struct {
 	vram  [VRAM_SIZE]uint8
 	oam   [OAM_SIZE]uint8
 	mmu   *MMU
+	dmac  *DMAC
 	ticks int
+
+	lcdc       uint8
+	stat       uint8
+	scy        uint8
+	scx        uint8
+	ly         uint8
+	lyc        uint8
+	dma        uint8
+	bgPalette  uint8
+	spPalettes [NUM_SP_PALETTES]uint8
+	wy         uint8
+	wx         uint8
 }
 
 const (
@@ -24,8 +37,21 @@ const (
 	OAM_BASE = 0xFE00
 	OAM_TOP  = 0xFE9F
 
-	TILE_SIZE  = 16
-	TILE_WIDTH = 8
+	TILE_SIZE       = 16
+	TILE_WIDTH      = 8
+	NUM_SP_PALETTES = 2
+
+	LCDC_ADDR             = 0xFF40
+	STAT_ADDR             = 0xFF41
+	SCY_ADDR              = 0xFF42
+	SCX_ADDR              = 0xFF43
+	LY_ADDR               = 0xFF44
+	LYC_ADDR              = 0xFF45
+	OAM_DMA_TRANSFER_ADDR = 0xFF46
+	BG_PALETTE_ADDR       = 0xFF47
+	SP_PALETTE_BASE       = 0xFF48
+	WY_ADDR               = 0xFF4A
+	WX_ADDR               = 0xFF4B
 )
 
 var pallete = [4]color.RGBA{
@@ -55,24 +81,54 @@ var pallete = [4]color.RGBA{
 	},
 }
 
-func (ppu *PPU) init(mmu *MMU) {
+func (ppu *PPU) init(mmu *MMU, dmac *DMAC) {
 	ppu.vram = [VRAM_SIZE]uint8{}
 	ppu.oam = [OAM_SIZE]uint8{}
 	ppu.mmu = mmu
-	ppu.ticks = 0
+	ppu.dmac = dmac
 }
 
 func (ppu *PPU) contains(addr uint16) bool {
-	return inRange(addr, VRAM_BASE, VRAM_TOP) || inRange(addr, OAM_BASE, OAM_TOP)
+	return inRange(addr, VRAM_BASE, VRAM_TOP) || inRange(addr, OAM_BASE, OAM_TOP) || inRange(addr, LCDC_ADDR, WX_ADDR)
 }
 
 func (ppu *PPU) write(addr uint16, data uint8) {
 	if inRange(addr, VRAM_BASE, VRAM_TOP) {
 		ppu.vram[addr-VRAM_BASE] = data
+		return
 	} else if inRange(addr, OAM_BASE, OAM_TOP) {
 		ppu.oam[addr-OAM_BASE] = data
-	} else {
-		log.Fatal("MMU mapped an illegal write address: 0x%02x to PPU", addr)
+		return
+	}
+
+	switch addr {
+	case LCDC_ADDR:
+		ppu.lcdc = data
+	case STAT_ADDR:
+		ppu.stat = data
+	case SCY_ADDR:
+		ppu.scy = data
+	case SCX_ADDR:
+		ppu.scx = data
+	case LY_ADDR:
+		ppu.ly = data
+	case LYC_ADDR:
+		ppu.lyc = data
+	case OAM_DMA_TRANSFER_ADDR:
+		ppu.dma = data
+		ppu.dmac.initOAMTransfer(data)
+	case BG_PALETTE_ADDR:
+		ppu.bgPalette = data
+	case SP_PALETTE_BASE:
+		ppu.spPalettes[0] = data
+	case SP_PALETTE_BASE + 1:
+		ppu.spPalettes[1] = data
+	case WY_ADDR:
+		ppu.wy = data
+	case WX_ADDR:
+		ppu.wx = data
+	default:
+		log.Fatalf("MMU mapped an illegal write address: 0x%02x to PPU", addr)
 	}
 }
 
@@ -81,8 +137,37 @@ func (ppu *PPU) read(addr uint16) uint8 {
 		return ppu.vram[addr-VRAM_BASE]
 	} else if inRange(addr, OAM_BASE, OAM_TOP) {
 		return ppu.oam[addr-OAM_BASE]
-	} else {
-		log.Fatal("MMU mapped an illegal read address: 0x%02x to PPU", addr)
+	}
+
+	switch addr {
+	case LCDC_ADDR:
+		return ppu.lcdc
+	case STAT_ADDR:
+		return ppu.stat
+	case SCY_ADDR:
+		return ppu.scy
+	case SCX_ADDR:
+		return ppu.scx
+	case LY_ADDR:
+		res := ppu.ly
+		ppu.ly++
+		return res
+	case LYC_ADDR:
+		return ppu.lyc
+	case OAM_DMA_TRANSFER_ADDR:
+		return ppu.dma
+	case BG_PALETTE_ADDR:
+		return ppu.bgPalette
+	case SP_PALETTE_BASE:
+		return ppu.spPalettes[0]
+	case SP_PALETTE_BASE + 1:
+		return ppu.spPalettes[1]
+	case WY_ADDR:
+		return ppu.wy
+	case WX_ADDR:
+		return ppu.wx
+	default:
+		log.Fatalf("MMU mapped an illegal read address: 0x%02x to PPU", addr)
 		return 0xFF
 	}
 }
@@ -92,13 +177,13 @@ func (ppu *PPU) updateDebugScreen(screen *ebiten.Image, xOff int, yOff int) {
 
 	for y := 0; y < DEBUG_SCREEN_HEIGHT/TILE_WIDTH; y++ {
 		for x := 0; x < DEBUG_SCREEN_WIDTH/TILE_WIDTH; x++ {
-			ppu.drawTile(screen, tileId, xOff+(x*TILE_WIDTH), yOff+(y*TILE_WIDTH))
+			ppu.writeTile(screen, tileId, xOff+(x*TILE_WIDTH), yOff+(y*TILE_WIDTH))
 			tileId++
 		}
 	}
 }
 
-func (ppu *PPU) drawTile(screen *ebiten.Image, tileId uint16, x int, y int) {
+func (ppu *PPU) writeTile(screen *ebiten.Image, tileId uint16, x int, y int) {
 	tileOff := tileId * TILE_SIZE
 
 	for tileRow := 0; tileRow < 16; tileRow += 2 {
@@ -106,11 +191,15 @@ func (ppu *PPU) drawTile(screen *ebiten.Image, tileId uint16, x int, y int) {
 		hiByte := ppu.vram[tileOff+uint16(tileRow)+1]
 
 		for bit := 7; bit >= 0; bit-- {
-			pixLoBit := bits.GetBit(loByte, uint8(bit))
-			pixHiBit := bits.GetBit(hiByte, uint8(bit)) << 1
-
-			color := pallete[pixHiBit|pixLoBit]
+			color := ppu.computeColor(loByte, hiByte, uint8(bit))
 			screen.Set(x+(7-bit), y+(tileRow/2), color)
 		}
 	}
+}
+
+func (ppu *PPU) computeColor(loByte uint8, hiByte uint8, pos uint8) color.RGBA {
+	pixLoBit := bits.GetBit(loByte, uint8(pos))
+	pixHiBit := bits.GetBit(hiByte, uint8(pos)) << 1
+
+	return pallete[pixHiBit|pixLoBit]
 }
