@@ -7,13 +7,15 @@ import (
 )
 
 type Timer struct {
+	mmu *MMU
+	ic  *IntruptController
+
 	div         uint8
 	tima        uint8
 	tma         uint8
 	tac         uint8
 	divCounter  int
 	timaCounter int
-	mmu         *MMU
 }
 
 const (
@@ -32,14 +34,15 @@ const (
 	HZ_16386  = 3
 )
 
-func (t *Timer) init(mmu *MMU) {
+func (t *Timer) init(mmu *MMU, ic *IntruptController) {
+	t.mmu = mmu
+	t.ic = ic
 	t.div = 0xAB
 	t.tima = 0x0
 	t.tma = 0x0
 	t.tac = 0x0
 	t.divCounter = 0xCC
 	t.timaCounter = 0x0
-	t.mmu = mmu
 }
 
 func (t *Timer) contains(addr uint16) bool {
@@ -127,7 +130,7 @@ func (t *Timer) stepTIMA(cTicks int) {
 		t.tima++
 
 		if t.tima == 0x00 {
-			t.mmu.write(IF_ADDR, bits.Set(t.mmu.read(IF_ADDR), TIMER_INTRUPT_BIT))
+			t.ic.requestIntrupt(TIMER_INTRUPT_BIT)
 			t.tima = t.tma
 		}
 	}

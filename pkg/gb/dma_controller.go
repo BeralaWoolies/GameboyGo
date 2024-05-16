@@ -1,18 +1,17 @@
 package gb
 
-import (
-	"fmt"
-)
+import "fmt"
 
-type DMAC struct {
+type DMAController struct {
+	mmu *MMU
+
 	src      uint8
 	active   bool
 	currByte uint16
 	delayed  bool
-	mmu      *MMU
 }
 
-func (dmac *DMAC) init(mmu *MMU) {
+func (dmac *DMAController) init(mmu *MMU) {
 	dmac.src = 0
 	dmac.active = false
 	dmac.currByte = 0
@@ -20,7 +19,7 @@ func (dmac *DMAC) init(mmu *MMU) {
 	dmac.mmu = mmu
 }
 
-func (dmac *DMAC) step(cTicks int) {
+func (dmac *DMAController) step(cTicks int) {
 	if !dmac.active {
 		return
 	}
@@ -39,7 +38,7 @@ func (dmac *DMAC) step(cTicks int) {
 	}
 }
 
-func (dmac *DMAC) transferOAM() {
+func (dmac *DMAController) transferOAM() {
 	if !dmac.active {
 		return
 	}
@@ -55,7 +54,7 @@ func (dmac *DMAC) transferOAM() {
 	}
 }
 
-func (dmac *DMAC) initOAMTransfer(data uint8) {
+func (dmac *DMAController) initOAMTransfer(data uint8) {
 	fmt.Printf("DMA OAM transfer starting at 0x%02x\n", data)
 	dmac.src = data
 	dmac.active = true

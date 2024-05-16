@@ -9,10 +9,12 @@ import (
 )
 
 type PPU struct {
+	mmu  *MMU
+	dmac *DMAController
+	ic   *IntruptController
+
 	vram  [VRAM_SIZE]uint8
 	oam   [OAM_SIZE]uint8
-	mmu   *MMU
-	dmac  *DMAC
 	ticks int
 
 	lcdc       uint8
@@ -26,6 +28,13 @@ type PPU struct {
 	spPalettes [NUM_SP_PALETTES]uint8
 	wy         uint8
 	wx         uint8
+
+	currState PPUState
+	xDraw     uint8
+}
+
+type PPUState interface {
+	tick()
 }
 
 const (
@@ -52,6 +61,13 @@ const (
 	SP_PALETTE_BASE       = 0xFF48
 	WY_ADDR               = 0xFF4A
 	WX_ADDR               = 0xFF4B
+
+	TICKS_PER_SCANLINE  = 456
+	SCANLINES_PER_FRAME = GB_SCREEN_HEIGHT + 10
+
+	STAT_LYC_COND_BIT      = 2
+	STAT_LYC_ENABLE_BIT    = 6
+	STAT_VBLANK_ENABLE_BIT = 4
 )
 
 var pallete = [4]color.RGBA{
@@ -81,15 +97,34 @@ var pallete = [4]color.RGBA{
 	},
 }
 
-func (ppu *PPU) init(mmu *MMU, dmac *DMAC) {
-	ppu.vram = [VRAM_SIZE]uint8{}
-	ppu.oam = [OAM_SIZE]uint8{}
+func (ppu *PPU) init(mmu *MMU, dmac *DMAController, ic *IntruptController) {
 	ppu.mmu = mmu
 	ppu.dmac = dmac
+	ppu.ic = ic
+	ppu.vram = [VRAM_SIZE]uint8{}
+	ppu.oam = [OAM_SIZE]uint8{}
+	ppu.currState = newOAMState(ppu)
+	ppu.lcdc = 0x91
+	ppu.ticks = 0
+	ppu.ly = 0
+	ppu.xDraw = 0
+}
+
+func (ppu *PPU) step(cTicks int) {
+	for i := 0; i < cTicks; i++ {
+		ppu.ticks++
+		ppu.currState.tick()
+	}
+}
+
+func (ppu *PPU) setState(s PPUState) {
+	ppu.currState = s
 }
 
 func (ppu *PPU) contains(addr uint16) bool {
-	return inRange(addr, VRAM_BASE, VRAM_TOP) || inRange(addr, OAM_BASE, OAM_TOP) || inRange(addr, LCDC_ADDR, WX_ADDR)
+	return (inRange(addr, VRAM_BASE, VRAM_TOP) ||
+		inRange(addr, OAM_BASE, OAM_TOP) ||
+		inRange(addr, LCDC_ADDR, WX_ADDR))
 }
 
 func (ppu *PPU) write(addr uint16, data uint8) {
@@ -149,9 +184,7 @@ func (ppu *PPU) read(addr uint16) uint8 {
 	case SCX_ADDR:
 		return ppu.scx
 	case LY_ADDR:
-		res := ppu.ly
-		ppu.ly++
-		return res
+		return ppu.ly
 	case LYC_ADDR:
 		return ppu.lyc
 	case OAM_DMA_TRANSFER_ADDR:
@@ -169,6 +202,20 @@ func (ppu *PPU) read(addr uint16) uint8 {
 	default:
 		log.Fatalf("MMU mapped an illegal read address: 0x%02x to PPU", addr)
 		return 0xFF
+	}
+}
+
+func (ppu *PPU) incLY() {
+	ppu.ly++
+
+	if ppu.ly == ppu.lyc {
+		ppu.stat = bits.Set(ppu.stat, STAT_LYC_COND_BIT)
+
+		if bits.IsSet(ppu.stat, STAT_LYC_ENABLE_BIT) {
+			ppu.ic.requestIntrupt(LCD_INTRUPT_BIT)
+		}
+	} else {
+		ppu.stat = bits.Reset(ppu.stat, STAT_LYC_COND_BIT)
 	}
 }
 
