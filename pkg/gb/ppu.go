@@ -336,17 +336,6 @@ func (ppu *PPU) read(addr uint16) uint8 {
 	}
 }
 
-func (ppu *PPU) updateDebugScreen(screen *ebiten.Image, xOff int, yOff int) {
-	var tileId uint16 = 0
-
-	for y := 0; y < DEBUG_SCREEN_HEIGHT/TILE_WIDTH; y++ {
-		for x := 0; x < DEBUG_SCREEN_WIDTH/TILE_WIDTH; x++ {
-			ppu.writeTile(screen, tileId, xOff+(x*TILE_WIDTH), yOff+(y*TILE_WIDTH))
-			tileId++
-		}
-	}
-}
-
 func (ppu *PPU) updateGBScreen(screen *ebiten.Image, xOff int, yOff int) {
 	for y := 0; y < GB_SCREEN_HEIGHT; y++ {
 		for x := 0; x < GB_SCREEN_WIDTH; x++ {
@@ -374,4 +363,31 @@ func getPaletteId(loByte uint8, hiByte uint8, pos uint8) uint8 {
 	pixHiBit := bits.GetBit(hiByte, pos) << 1
 
 	return pixHiBit | pixLoBit
+}
+
+// ============================= Debug Functions ===============================
+func (ppu *PPU) updateTileDataScreen(screen *ebiten.Image, xOff int, yOff int) {
+	var tileId uint16 = 0
+
+	for y := 0; y < TILE_DATA_SCREEN_HEIGHT/TILE_WIDTH; y++ {
+		for x := 0; x < TILE_DATA_SCREEN_WIDTH/TILE_WIDTH; x++ {
+			ppu.writeTile(screen, tileId, xOff+(x*TILE_WIDTH), yOff+(y*TILE_WIDTH))
+			tileId++
+		}
+	}
+}
+
+func (ppu *PPU) updateTileMaps(screen *ebiten.Image, xOff int, yOff int) {
+	var tileMap1 uint16 = 0x9800
+	var tileMap2 uint16 = 0x9C00
+
+	for y := 0; y < TILE_MAP_SCREEN_WIDTH/TILE_WIDTH; y++ {
+		for x := 0; x < TILE_MAP_SCREEN_WIDTH/TILE_WIDTH; x++ {
+			tileMap1Addr := tileMap1 + uint16(y)*TILE_MAP_WIDTH + uint16(x)
+			tileMap2Addr := tileMap2 + uint16(y)*TILE_MAP_WIDTH + uint16(x)
+
+			ppu.writeTile(screen, uint16(ppu.vram[tileMap1Addr-VRAM_BASE]), xOff+(x*TILE_WIDTH), yOff+(y*TILE_WIDTH))
+			ppu.writeTile(screen, uint16(ppu.vram[tileMap2Addr-VRAM_BASE]), xOff+TILE_MAP_SCREEN_WIDTH+(x*TILE_WIDTH), yOff+(y*TILE_WIDTH))
+		}
+	}
 }

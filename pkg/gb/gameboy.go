@@ -22,14 +22,17 @@ const (
 	FPS             = 60
 	TICKS_PER_FRAME = TICKS_PER_SCANLINE * SCANLINES_PER_FRAME
 
-	SCREEN_WIDTH  = GB_SCREEN_WIDTH + DEBUG_SCREEN_WIDTH
-	SCREEN_HEIGHT = max(GB_SCREEN_HEIGHT, DEBUG_SCREEN_HEIGHT)
+	SCREEN_WIDTH  = GB_SCREEN_WIDTH + TILE_DATA_SCREEN_WIDTH + (2 * TILE_MAP_SCREEN_WIDTH)
+	SCREEN_HEIGHT = max(GB_SCREEN_HEIGHT, TILE_DATA_SCREEN_HEIGHT, TILE_MAP_SCREEN_HEIGHT)
 
 	GB_SCREEN_WIDTH  = 160
 	GB_SCREEN_HEIGHT = 144
 
-	DEBUG_SCREEN_WIDTH  = 128
-	DEBUG_SCREEN_HEIGHT = 192
+	TILE_DATA_SCREEN_WIDTH  = 128
+	TILE_DATA_SCREEN_HEIGHT = 192
+
+	TILE_MAP_SCREEN_WIDTH  = 256
+	TILE_MAP_SCREEN_HEIGHT = 256
 
 	WINDOW_WIDTH  = SCREEN_WIDTH * 3
 	WINDOW_HEIGHT = SCREEN_HEIGHT * 3
@@ -121,9 +124,10 @@ func (gb *Gameboy) Update() error {
 }
 
 func (gb *Gameboy) Draw(screen *ebiten.Image) {
-	gb.ppu.updateGBScreen(screen, 0, (DEBUG_SCREEN_HEIGHT-GB_SCREEN_HEIGHT)/2)
+	gb.ppu.updateGBScreen(screen, 0, (TILE_DATA_SCREEN_HEIGHT-GB_SCREEN_HEIGHT)/2)
 	ebitenutil.DebugPrint(screen, strconv.Itoa(int(ebiten.ActualFPS())))
-	gb.ppu.updateDebugScreen(screen, GB_SCREEN_WIDTH, 0)
+	gb.ppu.updateTileDataScreen(screen, GB_SCREEN_WIDTH, 0)
+	gb.ppu.updateTileMaps(screen, GB_SCREEN_WIDTH+TILE_DATA_SCREEN_WIDTH, 0)
 }
 
 func (gb *Gameboy) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
