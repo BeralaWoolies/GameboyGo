@@ -55,6 +55,9 @@ func (r *GenericRAM) contains(addr uint16) bool {
 }
 
 func (r *GenericRAM) read(addr uint16) uint8 {
+	if addr == 0xFF00 {
+		return 0xFF
+	}
 	return r.memory[addr-RAM_BASE]
 }
 
