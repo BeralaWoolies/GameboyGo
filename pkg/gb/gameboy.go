@@ -3,8 +3,10 @@ package gb
 import (
 	"fmt"
 	"log"
+	"strconv"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
 type Gameboy struct {
@@ -92,6 +94,8 @@ func (gb *Gameboy) Start() {
 	ebiten.SetWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT)
 	ebiten.SetWindowTitle("GameboyGo")
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
+	ebiten.SetVsyncEnabled(false)
+	ebiten.SetTPS(FPS)
 
 	if err := ebiten.RunGame(gb); err != nil {
 		log.Fatal(err)
@@ -105,17 +109,19 @@ func (gb *Gameboy) Update() error {
 			cTicks = gb.cpu.step()
 		}
 
-		cTicksThisUpdate += cTicks
 		gb.ppu.step(cTicks)
 		gb.timer.step(cTicks)
 		gb.dmac.step(cTicks)
-		cTicksThisUpdate += gb.ic.handleIntrupts()
+
+		cTicksThisUpdate += (cTicks + gb.ic.handleIntrupts())
 	}
 
 	return nil
 }
 
 func (gb *Gameboy) Draw(screen *ebiten.Image) {
+	gb.ppu.updateGBScreen(screen, 0, (DEBUG_SCREEN_HEIGHT-GB_SCREEN_HEIGHT)/2)
+	ebitenutil.DebugPrint(screen, strconv.Itoa(int(ebiten.ActualFPS())))
 	gb.ppu.updateDebugScreen(screen, GB_SCREEN_WIDTH, 0)
 }
 

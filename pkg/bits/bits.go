@@ -25,5 +25,5 @@ func IsSet(val uint8, pos uint8) bool {
 }
 
 func GetBit(val uint8, pos uint8) uint8 {
-	return (val & (1 << pos)) >> pos
+	return (val >> pos) & 1
 }

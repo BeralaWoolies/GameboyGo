@@ -9,9 +9,11 @@ import (
 )
 
 type PPU struct {
-	mmu  *MMU
-	dmac *DMAController
-	ic   *IntruptController
+	mmu         *MMU
+	dmac        *DMAController
+	ic          *IntruptController
+	pxF         *PixelFIFO
+	frameBuffer [GB_SCREEN_WIDTH][GB_SCREEN_HEIGHT]color.RGBA
 
 	vram  [VRAM_SIZE]uint8
 	oam   [OAM_SIZE]uint8
@@ -33,9 +35,7 @@ type PPU struct {
 	xDraw     uint8
 }
 
-type PPUState interface {
-	tick()
-}
+type PPUState uint8
 
 const (
 	VRAM_SIZE = 0x2000
@@ -48,6 +48,7 @@ const (
 
 	TILE_SIZE       = 16
 	TILE_WIDTH      = 8
+	TILE_MAP_WIDTH  = 32
 	NUM_SP_PALETTES = 2
 
 	LCDC_ADDR             = 0xFF40
@@ -65,9 +66,23 @@ const (
 	TICKS_PER_SCANLINE  = 456
 	SCANLINES_PER_FRAME = GB_SCREEN_HEIGHT + 10
 
-	STAT_LYC_COND_BIT      = 2
-	STAT_LYC_ENABLE_BIT    = 6
-	STAT_VBLANK_ENABLE_BIT = 4
+	STAT_LYC           = 2
+	STAT_SELECT_HBLANK = 3
+	STAT_SELECT_VBLANK = 4
+	STAT_SELECT_OAM    = 5
+	STAT_SELECT_LYC    = 6
+	STAT_MSK           = 0x7F
+	STAT_RW_MSK        = 0x78
+
+	LCDC_BG_TILE_MAP    = 3
+	LCDC_TILE_DATA_AREA = 4
+
+	OAM_SCAN       PPUState = 2
+	PIXEL_TRANSFER PPUState = 3
+	HBLANK         PPUState = 0
+	VBLANK         PPUState = 1
+
+	OAM_SCAN_TICKS = 80
 )
 
 var pallete = [4]color.RGBA{
@@ -101,9 +116,13 @@ func (ppu *PPU) init(mmu *MMU, dmac *DMAController, ic *IntruptController) {
 	ppu.mmu = mmu
 	ppu.dmac = dmac
 	ppu.ic = ic
+	ppu.pxF = &PixelFIFO{}
+	ppu.pxF.init(ppu)
+	ppu.frameBuffer = [GB_SCREEN_WIDTH][GB_SCREEN_HEIGHT]color.RGBA{}
+
 	ppu.vram = [VRAM_SIZE]uint8{}
 	ppu.oam = [OAM_SIZE]uint8{}
-	ppu.currState = newOAMState(ppu)
+	ppu.currState = OAM_SCAN
 	ppu.lcdc = 0x91
 	ppu.ticks = 0
 	ppu.ly = 0
@@ -112,13 +131,124 @@ func (ppu *PPU) init(mmu *MMU, dmac *DMAController, ic *IntruptController) {
 
 func (ppu *PPU) step(cTicks int) {
 	for i := 0; i < cTicks; i++ {
-		ppu.ticks++
-		ppu.currState.tick()
+		ppu.tick()
 	}
 }
 
-func (ppu *PPU) setState(s PPUState) {
-	ppu.currState = s
+func (ppu *PPU) tick() {
+	ppu.ticks++
+
+	switch ppu.currState {
+	case OAM_SCAN:
+		if ppu.ticks >= OAM_SCAN_TICKS {
+			// end of OAM scan, move to pixel transfer
+			ppu.setState(PIXEL_TRANSFER)
+		}
+	case PIXEL_TRANSFER:
+		ppu.pxF.tick()
+
+		if pId, err := ppu.pxF.push(); err == nil {
+			ppu.frameBuffer[ppu.xDraw][ppu.ly] = pallete[pId]
+			ppu.xDraw++
+		}
+
+		if ppu.xDraw >= GB_SCREEN_WIDTH {
+			// end of pixel transfer, move to HBLANK
+			ppu.setState(HBLANK)
+		}
+	case HBLANK:
+		if ppu.ticks >= TICKS_PER_SCANLINE {
+			ppu.resetTicks()
+			ppu.incLY()
+
+			if ppu.ly >= GB_SCREEN_HEIGHT {
+				ppu.setState(VBLANK)
+			} else {
+				ppu.setState(OAM_SCAN)
+			}
+		}
+	case VBLANK:
+		if ppu.ticks >= TICKS_PER_SCANLINE {
+			ppu.resetTicks()
+			ppu.incLY()
+
+			if ppu.ly >= SCANLINES_PER_FRAME {
+				ppu.resetLY()
+				ppu.setState(OAM_SCAN)
+			}
+		}
+	default:
+		log.Fatalf("PPU is in an unimplemented state")
+	}
+}
+
+func (ppu *PPU) setState(state PPUState) {
+	ppu.currState = state
+	ppu.stat = bits.Reset(ppu.stat, 0)
+	ppu.stat = bits.Reset(ppu.stat, 1)
+	ppu.stat |= uint8(state)
+
+	ppu.updateStat(state)
+}
+
+func (ppu *PPU) updateStat(state PPUState) {
+	switch state {
+	case OAM_SCAN:
+		if bits.IsSet(ppu.stat, STAT_SELECT_OAM) {
+			ppu.ic.requestIntrupt(LCD_INTRUPT_BIT)
+		}
+	case PIXEL_TRANSFER:
+		ppu.xDraw = 0
+		ppu.pxF.start()
+	case HBLANK:
+		if bits.IsSet(ppu.stat, STAT_SELECT_HBLANK) {
+			ppu.ic.requestIntrupt(LCD_INTRUPT_BIT)
+		}
+	case VBLANK:
+		ppu.ic.requestIntrupt(VBLANK_INTRUPT_BIT)
+
+		if bits.IsSet(ppu.stat, STAT_SELECT_VBLANK) {
+			ppu.ic.requestIntrupt(LCD_INTRUPT_BIT)
+		}
+	}
+}
+
+func (ppu *PPU) getBGTileMap() uint16 {
+	if bits.IsSet(ppu.lcdc, LCDC_BG_TILE_MAP) {
+		return 0x9C00
+	}
+
+	return 0x9800
+}
+
+func (ppu *PPU) getTileDataArea() (tileDataArea uint16, unsig bool) {
+	if bits.IsSet(ppu.lcdc, LCDC_TILE_DATA_AREA) {
+		return VRAM_BASE, true
+	}
+
+	return 0x9000, false
+}
+
+func (ppu *PPU) resetTicks() {
+	ppu.ticks = 0
+}
+
+func (ppu *PPU) resetLY() {
+	ppu.ly = 0
+}
+
+func (ppu *PPU) incLY() {
+	ppu.ly++
+
+	if ppu.ly == ppu.lyc {
+		ppu.stat = bits.Set(ppu.stat, STAT_LYC)
+
+		if bits.IsSet(ppu.stat, STAT_SELECT_LYC) {
+			ppu.ic.requestIntrupt(LCD_INTRUPT_BIT)
+		}
+	} else {
+		ppu.stat = bits.Reset(ppu.stat, STAT_LYC)
+	}
 }
 
 func (ppu *PPU) contains(addr uint16) bool {
@@ -140,13 +270,14 @@ func (ppu *PPU) write(addr uint16, data uint8) {
 	case LCDC_ADDR:
 		ppu.lcdc = data
 	case STAT_ADDR:
-		ppu.stat = data
+		ppu.stat = data & STAT_RW_MSK
 	case SCY_ADDR:
 		ppu.scy = data
 	case SCX_ADDR:
 		ppu.scx = data
 	case LY_ADDR:
-		ppu.ly = data
+		// LY is read only
+		return
 	case LYC_ADDR:
 		ppu.lyc = data
 	case OAM_DMA_TRANSFER_ADDR:
@@ -178,7 +309,7 @@ func (ppu *PPU) read(addr uint16) uint8 {
 	case LCDC_ADDR:
 		return ppu.lcdc
 	case STAT_ADDR:
-		return ppu.stat
+		return ppu.stat & STAT_MSK
 	case SCY_ADDR:
 		return ppu.scy
 	case SCX_ADDR:
@@ -205,20 +336,6 @@ func (ppu *PPU) read(addr uint16) uint8 {
 	}
 }
 
-func (ppu *PPU) incLY() {
-	ppu.ly++
-
-	if ppu.ly == ppu.lyc {
-		ppu.stat = bits.Set(ppu.stat, STAT_LYC_COND_BIT)
-
-		if bits.IsSet(ppu.stat, STAT_LYC_ENABLE_BIT) {
-			ppu.ic.requestIntrupt(LCD_INTRUPT_BIT)
-		}
-	} else {
-		ppu.stat = bits.Reset(ppu.stat, STAT_LYC_COND_BIT)
-	}
-}
-
 func (ppu *PPU) updateDebugScreen(screen *ebiten.Image, xOff int, yOff int) {
 	var tileId uint16 = 0
 
@@ -226,6 +343,14 @@ func (ppu *PPU) updateDebugScreen(screen *ebiten.Image, xOff int, yOff int) {
 		for x := 0; x < DEBUG_SCREEN_WIDTH/TILE_WIDTH; x++ {
 			ppu.writeTile(screen, tileId, xOff+(x*TILE_WIDTH), yOff+(y*TILE_WIDTH))
 			tileId++
+		}
+	}
+}
+
+func (ppu *PPU) updateGBScreen(screen *ebiten.Image, xOff int, yOff int) {
+	for y := 0; y < GB_SCREEN_HEIGHT; y++ {
+		for x := 0; x < GB_SCREEN_WIDTH; x++ {
+			screen.Set(x+xOff, y+yOff, ppu.frameBuffer[x][y])
 		}
 	}
 }
@@ -238,15 +363,15 @@ func (ppu *PPU) writeTile(screen *ebiten.Image, tileId uint16, x int, y int) {
 		hiByte := ppu.vram[tileOff+uint16(tileRow)+1]
 
 		for bit := 7; bit >= 0; bit-- {
-			color := ppu.computeColor(loByte, hiByte, uint8(bit))
+			color := pallete[getPaletteId(loByte, hiByte, uint8(bit))]
 			screen.Set(x+(7-bit), y+(tileRow/2), color)
 		}
 	}
 }
 
-func (ppu *PPU) computeColor(loByte uint8, hiByte uint8, pos uint8) color.RGBA {
-	pixLoBit := bits.GetBit(loByte, uint8(pos))
-	pixHiBit := bits.GetBit(hiByte, uint8(pos)) << 1
+func getPaletteId(loByte uint8, hiByte uint8, pos uint8) uint8 {
+	pixLoBit := bits.GetBit(loByte, pos)
+	pixHiBit := bits.GetBit(hiByte, pos) << 1
 
-	return pallete[pixHiBit|pixLoBit]
+	return pixHiBit | pixLoBit
 }
