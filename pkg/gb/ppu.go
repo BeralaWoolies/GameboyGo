@@ -345,11 +345,18 @@ func (ppu *PPU) updateGBScreen(screen *ebiten.Image, xOff int, yOff int) {
 }
 
 func (ppu *PPU) writeTile(screen *ebiten.Image, tileId uint16, x int, y int) {
-	tileOff := tileId * TILE_SIZE
+	addr, unsig := ppu.getTileDataArea()
+	addr -= VRAM_BASE
+
+	if unsig {
+		addr += (uint16(tileId) * TILE_SIZE)
+	} else {
+		addr += (uint16(int(int8(tileId)) * TILE_SIZE))
+	}
 
 	for tileRow := 0; tileRow < 16; tileRow += 2 {
-		loByte := ppu.vram[tileOff+uint16(tileRow)]
-		hiByte := ppu.vram[tileOff+uint16(tileRow)+1]
+		loByte := ppu.vram[addr+uint16(tileRow)]
+		hiByte := ppu.vram[addr+uint16(tileRow)+1]
 
 		for bit := 7; bit >= 0; bit-- {
 			color := pallete[getPaletteId(loByte, hiByte, uint8(bit))]
