@@ -62,12 +62,7 @@ func (cpu *CPU) step() int {
 func (cpu *CPU) executeInstr(opcode uint8) int {
 	// fmt.Printf("Executing OPCODE: 0x%02x at PC: 0x%04x\n", opcode, gb.cpu.reg.PC-1)
 	instructions[opcode](cpu)
-	cTicks := instrClockTicks[opcode]
-	cpu.ticks += cTicks
-
-	// fmt.Println("Registers After: ")
-	// gb.printRegisters()
-	return cTicks
+	return instrClockTicks[opcode]
 }
 
 func (cpu *CPU) pushStack(addr uint16) {

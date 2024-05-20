@@ -19,9 +19,8 @@ type Gameboy struct {
 }
 
 const (
-	CLOCK_SPEED       = 4194304
-	FPS               = 60
-	C_TICKS_PER_FRAME = CLOCK_SPEED / FPS
+	FPS             = 60
+	TICKS_PER_FRAME = TICKS_PER_SCANLINE * SCANLINES_PER_FRAME
 
 	SCREEN_WIDTH  = GB_SCREEN_WIDTH + DEBUG_SCREEN_WIDTH
 	SCREEN_HEIGHT = max(GB_SCREEN_HEIGHT, DEBUG_SCREEN_HEIGHT)
@@ -103,18 +102,20 @@ func (gb *Gameboy) Start() {
 }
 
 func (gb *Gameboy) Update() error {
-	for cTicksThisUpdate := 0; cTicksThisUpdate < C_TICKS_PER_FRAME; {
-		cTicks := 4
+	for gb.cpu.ticks < TICKS_PER_FRAME {
+		ticksThisUpdate := 4
 		if !gb.cpu.halted {
-			cTicks = gb.cpu.step()
+			ticksThisUpdate = gb.cpu.step()
 		}
 
-		gb.ppu.step(cTicks)
-		gb.timer.step(cTicks)
-		gb.dmac.step(cTicks)
+		gb.ppu.step(ticksThisUpdate)
+		gb.timer.step(ticksThisUpdate)
+		gb.dmac.step(ticksThisUpdate)
 
-		cTicksThisUpdate += (cTicks + gb.ic.handleIntrupts())
+		gb.cpu.ticks += (ticksThisUpdate + gb.ic.handleIntrupts())
 	}
+
+	gb.cpu.ticks -= TICKS_PER_FRAME
 
 	return nil
 }
