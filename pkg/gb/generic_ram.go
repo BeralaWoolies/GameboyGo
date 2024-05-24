@@ -1,7 +1,5 @@
 package gb
 
-import "fmt"
-
 type GenericRAM struct {
 	memory [RAM_SIZE]uint8 // generic ram that covers 0xA000 - 0xFFFF
 }
@@ -55,17 +53,9 @@ func (r *GenericRAM) contains(addr uint16) bool {
 }
 
 func (r *GenericRAM) read(addr uint16) uint8 {
-	if addr == 0xFF00 {
-		return 0xFF
-	}
 	return r.memory[addr-RAM_BASE]
 }
 
 func (r *GenericRAM) write(addr uint16, data uint8) {
-	if addr == 0xFF01 {
-		// fmt.Printf("Write at: [0x%04x] = 0x%02x\n", address, data)
-		fmt.Printf("%c", data)
-	}
-
 	r.memory[addr-RAM_BASE] = data
 }

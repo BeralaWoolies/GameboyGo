@@ -16,6 +16,22 @@ func LoByte(val uint16) uint8 {
 	return uint8(val & 0xFF)
 }
 
+func SetCond(val uint8, pos uint8, cond uint8) uint8 {
+	if cond != 0 {
+		return Set(val, pos)
+	}
+
+	return Reset(val, pos)
+}
+
+func BoolToUint8(val bool) uint8 {
+	if val {
+		return 1
+	}
+
+	return 0
+}
+
 func IsSetInBoth(val1 uint8, val2 uint8, pos uint8) bool {
 	return IsSet(val1, pos) && IsSet(val2, pos)
 }

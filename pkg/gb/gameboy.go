@@ -10,12 +10,14 @@ import (
 )
 
 type Gameboy struct {
-	mmu   *MMU
-	cpu   *CPU
-	ppu   *PPU
-	timer *Timer
-	dmac  *DMAController
-	ic    *IntruptController
+	mmu         *MMU
+	cpu         *CPU
+	ppu         *PPU
+	joyp        *Joypad
+	timer       *Timer
+	dmac        *DMAController
+	ic          *IntruptController
+	btnMappings map[ebiten.Key]func(pressed bool)
 }
 
 const (
@@ -47,18 +49,21 @@ func NewGameboy(filename string) *Gameboy {
 func (gb *Gameboy) init(filename string) {
 	gb.initHardware()
 	gb.initMemoryMap(filename)
+	gb.bindUIEvents()
 }
 
 func (gb *Gameboy) initHardware() {
 	gb.mmu = &MMU{}
 	gb.cpu = &CPU{}
 	gb.ppu = &PPU{}
+	gb.joyp = &Joypad{}
 	gb.timer = &Timer{}
 	gb.dmac = &DMAController{}
 	gb.ic = &IntruptController{}
 
 	gb.cpu.init(gb.mmu)
 	gb.ppu.init(gb.mmu, gb.dmac, gb.ic)
+	gb.joyp.init(gb.ic)
 	gb.dmac.init(gb.mmu)
 	gb.timer.init(gb.mmu, gb.ic)
 	gb.ic.init(gb.mmu, gb.cpu)
@@ -68,6 +73,7 @@ func (gb *Gameboy) initMemoryMap(filename string) {
 	gb.mmu.mapAddrSpace(newBootROM("boot_rom.bin", gb.mmu))
 	gb.mmu.mapAddrSpace(newROM(filename))
 	gb.mmu.mapAddrSpace(gb.ppu)
+	gb.mmu.mapAddrSpace(gb.joyp)
 	gb.mmu.mapAddrSpace(gb.timer)
 	gb.mmu.mapAddrSpace(gb.ic)
 
@@ -76,6 +82,19 @@ func (gb *Gameboy) initMemoryMap(filename string) {
 
 	// manually disable boot rom for now
 	gb.mmu.write(BOOT_ROM_ENABLE_ADDR, 1)
+}
+
+func (gb *Gameboy) bindUIEvents() {
+	gb.btnMappings = map[ebiten.Key]func(pressed bool){
+		ebiten.KeyArrowUp:    gb.joyp.up.press,
+		ebiten.KeyArrowDown:  gb.joyp.down.press,
+		ebiten.KeyArrowRight: gb.joyp.right.press,
+		ebiten.KeyArrowLeft:  gb.joyp.left.press,
+		ebiten.KeyA:          gb.joyp.a.press,
+		ebiten.KeyS:          gb.joyp.b.press,
+		ebiten.KeySpace:      gb.joyp.sel.press,
+		ebiten.KeyEnter:      gb.joyp.start.press,
+	}
 }
 
 func (gb *Gameboy) printRegisters() {
@@ -105,6 +124,8 @@ func (gb *Gameboy) Start() {
 }
 
 func (gb *Gameboy) Update() error {
+	gb.handleUIEvents()
+
 	for gb.cpu.ticks < TICKS_PER_FRAME {
 		ticksThisUpdate := 4
 		if !gb.cpu.halted {
@@ -123,11 +144,17 @@ func (gb *Gameboy) Update() error {
 	return nil
 }
 
+func (gb *Gameboy) handleUIEvents() {
+	for kbKey, press := range gb.btnMappings {
+		press(ebiten.IsKeyPressed(kbKey))
+	}
+}
+
 func (gb *Gameboy) Draw(screen *ebiten.Image) {
 	gb.ppu.updateGBScreen(screen, 0, (TILE_DATA_SCREEN_HEIGHT-GB_SCREEN_HEIGHT)/2)
 	ebitenutil.DebugPrint(screen, strconv.Itoa(int(ebiten.ActualFPS())))
-	gb.ppu.updateTileDataScreen(screen, GB_SCREEN_WIDTH, 0)
-	gb.ppu.updateTileMaps(screen, GB_SCREEN_WIDTH+TILE_DATA_SCREEN_WIDTH, 0)
+	// gb.ppu.updateTileDataScreen(screen, GB_SCREEN_WIDTH, 0)
+	// gb.ppu.updateTileMaps(screen, GB_SCREEN_WIDTH+TILE_DATA_SCREEN_WIDTH, 0)
 }
 
 func (gb *Gameboy) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {

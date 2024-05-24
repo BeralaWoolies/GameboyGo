@@ -1,7 +1,5 @@
 package gb
 
-import "fmt"
-
 type DMAController struct {
 	mmu *MMU
 
@@ -48,14 +46,10 @@ func (dmac *DMAController) transferOAM() {
 	dmac.mmu.write(dest, src)
 
 	dmac.currByte++
-	dmac.active = bool(dmac.currByte < OAM_SIZE)
-	if !dmac.active {
-		fmt.Printf("DMA OAM transfer completed, %d bytes transferred\n", dmac.currByte)
-	}
+	dmac.active = dmac.currByte < OAM_SIZE
 }
 
 func (dmac *DMAController) initOAMTransfer(data uint8) {
-	fmt.Printf("DMA OAM transfer starting at 0x%02x\n", data)
 	dmac.src = data
 	dmac.active = true
 	dmac.currByte = 0

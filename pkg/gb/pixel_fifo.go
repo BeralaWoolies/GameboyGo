@@ -247,6 +247,7 @@ func (pxF *PixelFIFO) startBGFetch() {
 	pxF.bgFIFO.Clear()
 	pxF.windowFetch = false
 	pxF.tileMapY = uint16(pxF.ppu.ly + pxF.ppu.scy)
+	pxF.tileLine = pxF.tileMapY % TILE_WIDTH
 }
 
 func (pxF *PixelFIFO) getTileLine(tileId uint8, tileLine uint16) (loByte uint8, hiByte uint8) {

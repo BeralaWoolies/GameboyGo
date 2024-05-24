@@ -427,7 +427,7 @@ func (ppu *PPU) write(addr uint16, data uint8) {
 	case LCDC_ADDR:
 		ppu.lcdc = data
 	case STAT_ADDR:
-		ppu.stat = data & STAT_RW_MSK
+		ppu.stat = (data & STAT_RW_MSK) | 0x80
 	case SCY_ADDR:
 		ppu.scy = data
 	case SCX_ADDR:
@@ -466,7 +466,7 @@ func (ppu *PPU) read(addr uint16) uint8 {
 	case LCDC_ADDR:
 		return ppu.lcdc
 	case STAT_ADDR:
-		return ppu.stat & STAT_MSK
+		return ppu.stat | 0x80
 	case SCY_ADDR:
 		return ppu.scy
 	case SCX_ADDR:

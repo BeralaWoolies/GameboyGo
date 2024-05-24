@@ -36,5 +36,5 @@ func (r *ROM) read(addr uint16) uint8 {
 }
 
 func (r *ROM) write(addr uint16, data uint8) {
-	r.rom[addr] = data
+	return
 }
