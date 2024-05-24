@@ -1,84 +1,126 @@
+/*
+The following code was adapted from https://github.com/eapache/queue/blob/main/v2/queue.go
+*/
 package queue
 
-import (
-	"fmt"
-)
+// MIN_QUEUE_LEN is smallest capacity that queue may have.
+// Must be power of 2 for bitwise modulus: x % n == x & (n - 1).
+const MIN_QUEUE_LEN = 8
 
-type Queue[T any] struct {
-	data   []T
-	isFull bool
-	start  int
-	end    int
+// Queue represents a single instance of the queue data structure.
+type Queue[V any] struct {
+	Buf   []*V
+	Head  int
+	Tail  int
+	count int
 }
 
-func NewQueue[T any](capacity int) *Queue[T] {
-	return &Queue[T]{
-		data:   make([]T, capacity),
-		isFull: false,
-		start:  0,
-		end:    0,
+// New constructs and returns a new Queue.
+func New[V any]() *Queue[V] {
+	return &Queue[V]{
+		Buf: make([]*V, MIN_QUEUE_LEN),
 	}
 }
 
-func (q *Queue[T]) String() string {
-	return fmt.Sprintf(
-		"[Queue full:%v size:%d start:%d end:%d data:%v]",
-		q.isFull,
-		len(q.data),
-		q.start,
-		q.end,
-		q.data)
+// Length returns the number of elements currently stored in the queue.
+func (q *Queue[V]) Length() int {
+	return q.count
 }
 
-func (q *Queue[T]) Enqueue(elem T) error {
-	if q.isFull {
-		return fmt.Errorf("Queue is full")
+func (q *Queue[V]) IsEmpty() bool {
+	return q.Length() == 0
+}
+
+// resizes the queue to fit exactly twice its current contents
+// this can result in shrinking if the queue is less than half-full
+func (q *Queue[V]) resize() {
+	newBuf := make([]*V, q.count<<1)
+
+	if q.Tail > q.Head {
+		copy(newBuf, q.Buf[q.Head:q.Tail])
+	} else {
+		n := copy(newBuf, q.Buf[q.Head:])
+		copy(newBuf[n:], q.Buf[:q.Tail])
 	}
 
-	q.data[q.end] = elem
-	q.end = (q.end + 1) % len(q.data)
-	q.isFull = q.end == q.start
-
-	return nil
+	q.Head = 0
+	q.Tail = q.count
+	q.Buf = newBuf
 }
 
-func (q *Queue[T]) Dequeue() (T, error) {
-	var res T
-	if !q.isFull && q.start == q.end {
-		return res, fmt.Errorf("Queue is empty")
+// Add puts an element on the end of the queue.
+func (q *Queue[V]) Add(elem V) {
+	if q.count == len(q.Buf) {
+		q.resize()
 	}
 
-	res = q.data[q.start]
-	q.start = (q.start + 1) % len(q.data)
-	q.isFull = false
-
-	return res, nil
+	q.Buf[q.Tail] = &elem
+	// bitwise modulus
+	q.Tail = (q.Tail + 1) & (len(q.Buf) - 1)
+	q.count++
 }
 
-func (q *Queue[T]) Peek() (T, error) {
-	var res T
-	if !q.isFull && q.start == q.end {
-		return res, fmt.Errorf("Queue is empty")
+// Peek returns the element at the head of the queue. This call panics
+// if the queue is empty.
+func (q *Queue[V]) Peek() V {
+	if q.count <= 0 {
+		panic("queue: Peek() called on empty queue")
+	}
+	return *(q.Buf[q.Head])
+}
+
+// Get returns the element at index i in the queue. If the index is
+// invalid, the call will panic. This method accepts both positive and
+// negative index values. Index 0 refers to the first element, and
+// index -1 refers to the last.
+func (q *Queue[V]) Get(i int) V {
+	// If indexing backwards, convert to positive index.
+	if i < 0 {
+		i += q.count
+	}
+	if i < 0 || i >= q.count {
+		panic("queue: Get() called with index out of range")
+	}
+	// bitwise modulus
+	return *(q.Buf[(q.Head+i)&(len(q.Buf)-1)])
+}
+
+// Replace sets the element index i in the queue. If the index is
+// invalid, the call will panic. This method accepts both positive and
+// negative index values. Index 0 refers to the first element, and
+// index -1 refers to the last.
+func (q *Queue[V]) Replace(i int, elem V) {
+	// If indexing backwards, convert to positive index.
+	if i < 0 {
+		i += q.count
+	}
+	if i < 0 || i >= q.count {
+		panic("queue: Replace() called with index out of range")
 	}
 
-	return q.data[q.start], nil
+	q.Buf[(q.Head+i)&(len(q.Buf)-1)] = &elem
 }
 
-func (q *Queue[T]) Size() int {
-	res := q.end - q.start
-	if res < 0 || (res == 0 && q.isFull) {
-		res = len(q.data) - res
+// Remove removes and returns the element from the front of the queue. If the
+// queue is empty, the call will panic.
+func (q *Queue[V]) Remove() V {
+	if q.count <= 0 {
+		panic("queue: Remove() called on empty queue")
 	}
-
-	return res
+	ret := q.Buf[q.Head]
+	q.Buf[q.Head] = nil
+	// bitwise modulus
+	q.Head = (q.Head + 1) & (len(q.Buf) - 1)
+	q.count--
+	// Resize down if buffer 1/4 full.
+	if len(q.Buf) > MIN_QUEUE_LEN && (q.count<<2) == len(q.Buf) {
+		q.resize()
+	}
+	return *ret
 }
 
-func (q *Queue[T]) IsFull() bool {
-	return q.isFull
-}
-
-func (q *Queue[T]) Clear() {
-	q.start = 0
-	q.end = 0
-	q.isFull = false
+func (q *Queue[V]) Clear() {
+	q.Head = 0
+	q.Tail = 0
+	q.count = 0
 }

@@ -1,8 +1,10 @@
 package gb
 
 import (
+	"cmp"
 	"image/color"
 	"log"
+	"slices"
 
 	"github.com/BeralaWoolies/GameboyGo/pkg/bits"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -15,9 +17,12 @@ type PPU struct {
 	pxF         *PixelFIFO
 	frameBuffer [GB_SCREEN_WIDTH][GB_SCREEN_HEIGHT]color.RGBA
 
-	vram  [VRAM_SIZE]uint8
-	oam   [OAM_SIZE]uint8
-	ticks int
+	vram          [VRAM_SIZE]uint8
+	oam           [OAM_SIZE]uint8
+	oamScan       uint16
+	spriteBuffer  []Sprite
+	spritesOnLine uint8
+	ticks         int
 
 	lcdc       uint8
 	stat       uint8
@@ -30,12 +35,21 @@ type PPU struct {
 	spPalettes [NUM_SP_PALETTES]uint8
 	wy         uint8
 	wx         uint8
+	wly        uint8
 
 	currState PPUState
-	xDraw     uint8
+	lx        uint8
+	inWindow  bool
 }
 
 type PPUState uint8
+
+type Sprite struct {
+	x      uint8
+	y      uint8
+	tileId uint8
+	flags  uint8
+}
 
 const (
 	VRAM_SIZE = 0x2000
@@ -59,7 +73,8 @@ const (
 	LYC_ADDR              = 0xFF45
 	OAM_DMA_TRANSFER_ADDR = 0xFF46
 	BG_PALETTE_ADDR       = 0xFF47
-	SP_PALETTE_BASE       = 0xFF48
+	OBP0_ADDR             = 0xFF48
+	OBP1_ADDR             = 0xFF49
 	WY_ADDR               = 0xFF4A
 	WX_ADDR               = 0xFF4B
 
@@ -74,8 +89,15 @@ const (
 	STAT_MSK           = 0x7F
 	STAT_RW_MSK        = 0x78
 
+	LCDC_BGWIN_ENABLE   = 0
+	LCDC_OBJ_ENABLE     = 1
+	LCDC_OBJ_SIZE       = 2
 	LCDC_BG_TILE_MAP    = 3
 	LCDC_TILE_DATA_AREA = 4
+	LCDC_WIN_ENABLE     = 5
+	LCDC_WIN_TILE_MAP   = 6
+
+	SPRITES_PER_SCANLINE = 10
 
 	OAM_SCAN       PPUState = 2
 	PIXEL_TRANSFER PPUState = 3
@@ -87,27 +109,27 @@ const (
 
 var pallete = [4]color.RGBA{
 	0: color.RGBA{
-		R: 64,
-		G: 80,
-		B: 16,
+		R: 208,
+		G: 208,
+		B: 88,
 		A: 255,
 	},
 	1: color.RGBA{
-		R: 112,
-		G: 128,
-		B: 40,
-		A: 255,
-	},
-	2: color.RGBA{
 		R: 160,
 		G: 168,
 		B: 64,
 		A: 255,
 	},
+	2: color.RGBA{
+		R: 112,
+		G: 128,
+		B: 40,
+		A: 255,
+	},
 	3: color.RGBA{
-		R: 208,
-		G: 208,
-		B: 88,
+		R: 64,
+		G: 80,
+		B: 16,
 		A: 255,
 	},
 }
@@ -122,11 +144,12 @@ func (ppu *PPU) init(mmu *MMU, dmac *DMAController, ic *IntruptController) {
 
 	ppu.vram = [VRAM_SIZE]uint8{}
 	ppu.oam = [OAM_SIZE]uint8{}
-	ppu.currState = OAM_SCAN
-	ppu.lcdc = 0x91
+	ppu.spriteBuffer = make([]Sprite, 0, SPRITES_PER_SCANLINE)
+	ppu.setState(OAM_SCAN)
+	ppu.lcdc = 0
 	ppu.ticks = 0
 	ppu.ly = 0
-	ppu.xDraw = 0
+	ppu.lx = 0
 }
 
 func (ppu *PPU) step(cTicks int) {
@@ -140,28 +163,69 @@ func (ppu *PPU) tick() {
 
 	switch ppu.currState {
 	case OAM_SCAN:
+		ppu.scanOAM()
+
 		if ppu.ticks >= OAM_SCAN_TICKS {
 			// end of OAM scan, move to pixel transfer
+			slices.SortStableFunc(ppu.spriteBuffer, func(a, b Sprite) int {
+				return cmp.Compare(a.x, b.x)
+			})
 			ppu.setState(PIXEL_TRANSFER)
 		}
 	case PIXEL_TRANSFER:
-		ppu.pxF.tick()
-
-		if pId, err := ppu.pxF.push(); err == nil {
-			ppu.frameBuffer[ppu.xDraw][ppu.ly] = pallete[pId]
-			ppu.xDraw++
+		if ppu.winEnabled() && ppu.winEncountered() {
+			if !ppu.pxF.windowFetch {
+				ppu.pxF.startWinFetch()
+			}
+		} else {
+			if ppu.pxF.windowFetch {
+				ppu.pxF.startBGFetch()
+			}
 		}
 
-		if ppu.xDraw >= GB_SCREEN_WIDTH {
+		for ppu.spritesEnabled() && ppu.spriteEncountered() {
+			ppu.pxF.spriteFetchFIFO.Add(ppu.spriteBuffer[0])
+			ppu.spriteBuffer = ppu.spriteBuffer[1:]
+		}
+
+		ppu.pxF.tick()
+
+		if pxFItem, err := ppu.pxF.pop(); err == nil {
+			var color color.RGBA
+
+			switch pxFItem.palette {
+			case BGP:
+				color = getLCDColor(ppu.bgPalette, pxFItem.color)
+			case OBP0:
+				color = getLCDColor(ppu.spPalettes[0], pxFItem.color)
+			case OBP1:
+				color = getLCDColor(ppu.spPalettes[1], pxFItem.color)
+			}
+
+			ppu.frameBuffer[ppu.lx][ppu.ly] = color
+			ppu.lx++
+		}
+
+		if ppu.lx >= GB_SCREEN_WIDTH {
 			// end of pixel transfer, move to HBLANK
 			ppu.setState(HBLANK)
+
+			if ppu.winEnabled() && ppu.winEncountered() {
+				ppu.wly++
+			}
 		}
 	case HBLANK:
 		if ppu.ticks >= TICKS_PER_SCANLINE {
 			ppu.resetTicks()
 			ppu.incLY()
 
+			if ppu.winEnabled() && ppu.wy == ppu.ly {
+				ppu.inWindow = true
+			}
+
 			if ppu.ly >= GB_SCREEN_HEIGHT {
+				ppu.inWindow = false
+				ppu.wly = 0
 				ppu.setState(VBLANK)
 			} else {
 				ppu.setState(OAM_SCAN)
@@ -182,23 +246,108 @@ func (ppu *PPU) tick() {
 	}
 }
 
+func (ppu *PPU) scanOAM() {
+	if ppu.ticks&1 == 1 {
+		return
+	}
+
+	if ppu.spritesOnLine >= SPRITES_PER_SCANLINE {
+		return
+	}
+
+	spriteY := ppu.mmu.read(ppu.oamScan)
+	spriteX := ppu.mmu.read(ppu.oamScan + 1)
+	spriteTileId := ppu.mmu.read(ppu.oamScan + 2)
+	spriteFlags := ppu.mmu.read(ppu.oamScan + 3)
+
+	if spriteX > 0 && ppu.ly >= spriteY-16 && ppu.ly < spriteY+ppu.getSpriteHeight()-16 {
+		ppu.spriteBuffer = append(ppu.spriteBuffer, Sprite{
+			x:      spriteX,
+			y:      spriteY,
+			tileId: spriteTileId,
+			flags:  spriteFlags,
+		})
+		ppu.spritesOnLine++
+	}
+
+	ppu.oamScan += 4
+}
+
+func (ppu *PPU) getSpriteHeight() uint8 {
+	if bits.IsSet(ppu.lcdc, LCDC_OBJ_SIZE) {
+		return 16
+	}
+
+	return 8
+}
+
+func (sp *Sprite) getPalette() Palette {
+	if bits.IsSet(sp.flags, 4) {
+		return OBP1
+	}
+
+	return OBP0
+}
+
+func (sp *Sprite) flippedX() bool {
+	return bits.IsSet(sp.flags, 5)
+}
+
+func (sp *Sprite) flippedY() bool {
+	return bits.IsSet(sp.flags, 6)
+}
+
+func (sp *Sprite) getBGPriority() bool {
+	return bits.IsSet(sp.flags, 7)
+}
+
+func (ppu *PPU) spritesEnabled() bool {
+	return bits.IsSet(ppu.lcdc, LCDC_OBJ_ENABLE)
+}
+
+func (ppu *PPU) spriteEncountered() bool {
+	for _, sprite := range ppu.spriteBuffer {
+		if sprite.x-8 <= ppu.lx {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (ppu *PPU) winEncountered() bool {
+	return ppu.inWindow && ppu.lx >= ppu.wx-7
+}
+
+func (ppu *PPU) bgWinEnabled() bool {
+	return bits.IsSet(ppu.lcdc, LCDC_BGWIN_ENABLE)
+}
+
+func (ppu *PPU) winEnabled() bool {
+	return bits.IsSet(ppu.lcdc, LCDC_WIN_ENABLE)
+}
+
 func (ppu *PPU) setState(state PPUState) {
 	ppu.currState = state
-	ppu.stat = bits.Reset(ppu.stat, 0)
-	ppu.stat = bits.Reset(ppu.stat, 1)
-	ppu.stat |= uint8(state)
-
 	ppu.updateStat(state)
 }
 
 func (ppu *PPU) updateStat(state PPUState) {
+	ppu.stat = bits.Reset(ppu.stat, 0)
+	ppu.stat = bits.Reset(ppu.stat, 1)
+	ppu.stat |= uint8(state)
+
 	switch state {
 	case OAM_SCAN:
+		ppu.oamScan = OAM_BASE
+		ppu.spritesOnLine = 0
+		ppu.spriteBuffer = ppu.spriteBuffer[:0]
+
 		if bits.IsSet(ppu.stat, STAT_SELECT_OAM) {
 			ppu.ic.requestIntrupt(LCD_INTRUPT_BIT)
 		}
 	case PIXEL_TRANSFER:
-		ppu.xDraw = 0
+		ppu.lx = 0
 		ppu.pxF.start()
 	case HBLANK:
 		if bits.IsSet(ppu.stat, STAT_SELECT_HBLANK) {
@@ -221,8 +370,16 @@ func (ppu *PPU) getBGTileMap() uint16 {
 	return 0x9800
 }
 
+func (ppu *PPU) getWinTileMap() uint16 {
+	if bits.IsSet(ppu.lcdc, LCDC_WIN_TILE_MAP) {
+		return 0x9C00
+	}
+
+	return 0x9800
+}
+
 func (ppu *PPU) getTileDataArea() (tileDataArea uint16, unsig bool) {
-	if bits.IsSet(ppu.lcdc, LCDC_TILE_DATA_AREA) {
+	if bits.IsSet(ppu.lcdc, LCDC_TILE_DATA_AREA) || ppu.pxF.spriteFetch {
 		return VRAM_BASE, true
 	}
 
@@ -285,9 +442,9 @@ func (ppu *PPU) write(addr uint16, data uint8) {
 		ppu.dmac.initOAMTransfer(data)
 	case BG_PALETTE_ADDR:
 		ppu.bgPalette = data
-	case SP_PALETTE_BASE:
+	case OBP0_ADDR:
 		ppu.spPalettes[0] = data
-	case SP_PALETTE_BASE + 1:
+	case OBP1_ADDR:
 		ppu.spPalettes[1] = data
 	case WY_ADDR:
 		ppu.wy = data
@@ -322,9 +479,9 @@ func (ppu *PPU) read(addr uint16) uint8 {
 		return ppu.dma
 	case BG_PALETTE_ADDR:
 		return ppu.bgPalette
-	case SP_PALETTE_BASE:
+	case OBP0_ADDR:
 		return ppu.spPalettes[0]
-	case SP_PALETTE_BASE + 1:
+	case OBP1_ADDR:
 		return ppu.spPalettes[1]
 	case WY_ADDR:
 		return ppu.wy
@@ -359,17 +516,21 @@ func (ppu *PPU) writeTile(screen *ebiten.Image, tileId uint16, x int, y int) {
 		hiByte := ppu.vram[addr+uint16(tileRow)+1]
 
 		for bit := 7; bit >= 0; bit-- {
-			color := pallete[getPaletteId(loByte, hiByte, uint8(bit))]
+			color := getLCDColor(ppu.bgPalette, getColor(loByte, hiByte, uint8(bit)))
 			screen.Set(x+(7-bit), y+(tileRow/2), color)
 		}
 	}
 }
 
-func getPaletteId(loByte uint8, hiByte uint8, pos uint8) uint8 {
+func getColor(loByte uint8, hiByte uint8, pos uint8) uint8 {
 	pixLoBit := bits.GetBit(loByte, pos)
 	pixHiBit := bits.GetBit(hiByte, pos) << 1
 
 	return pixHiBit | pixLoBit
+}
+
+func getLCDColor(pal uint8, color uint8) color.RGBA {
+	return pallete[(pal>>(2*color))&3]
 }
 
 // ============================= Debug Functions ===============================
