@@ -14,6 +14,7 @@ type Gameboy struct {
 	cpu         *CPU
 	ppu         *PPU
 	joyp        *Joypad
+	serial      *SerialPort
 	timer       *Timer
 	dmac        *DMAController
 	ic          *IntruptController
@@ -57,6 +58,7 @@ func (gb *Gameboy) initHardware() {
 	gb.cpu = &CPU{}
 	gb.ppu = &PPU{}
 	gb.joyp = &Joypad{}
+	gb.serial = &SerialPort{}
 	gb.timer = &Timer{}
 	gb.dmac = &DMAController{}
 	gb.ic = &IntruptController{}
@@ -64,8 +66,9 @@ func (gb *Gameboy) initHardware() {
 	gb.cpu.init(gb.mmu)
 	gb.ppu.init(gb.mmu, gb.dmac, gb.ic)
 	gb.joyp.init(gb.ic)
-	gb.dmac.init(gb.mmu)
+	gb.serial.init(gb.ic)
 	gb.timer.init(gb.mmu, gb.ic)
+	gb.dmac.init(gb.mmu)
 	gb.ic.init(gb.mmu, gb.cpu)
 }
 
@@ -74,6 +77,7 @@ func (gb *Gameboy) initMemoryMap(filename string) {
 	gb.mmu.mapAddrSpace(newROM(filename))
 	gb.mmu.mapAddrSpace(gb.ppu)
 	gb.mmu.mapAddrSpace(gb.joyp)
+	gb.mmu.mapAddrSpace(gb.serial)
 	gb.mmu.mapAddrSpace(gb.timer)
 	gb.mmu.mapAddrSpace(gb.ic)
 
@@ -153,8 +157,8 @@ func (gb *Gameboy) handleUIEvents() {
 func (gb *Gameboy) Draw(screen *ebiten.Image) {
 	gb.ppu.updateGBScreen(screen, 0, (TILE_DATA_SCREEN_HEIGHT-GB_SCREEN_HEIGHT)/2)
 	ebitenutil.DebugPrint(screen, strconv.Itoa(int(ebiten.ActualFPS())))
-	// gb.ppu.updateTileDataScreen(screen, GB_SCREEN_WIDTH, 0)
-	// gb.ppu.updateTileMaps(screen, GB_SCREEN_WIDTH+TILE_DATA_SCREEN_WIDTH, 0)
+	gb.ppu.updateTileDataScreen(screen, GB_SCREEN_WIDTH, 0)
+	gb.ppu.updateTileMaps(screen, GB_SCREEN_WIDTH+TILE_DATA_SCREEN_WIDTH, 0)
 }
 
 func (gb *Gameboy) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
