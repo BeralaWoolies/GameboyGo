@@ -16,7 +16,7 @@ type IntruptController struct {
 const (
 	IF_ADDR     = 0xFF0F
 	IE_ADDR     = 0xFFFF
-	INTRUPT_MSK = 0x1F
+	INTRUPT_MSK = 0xE0
 
 	VBLANK_INTRUPT_BIT = 0
 	LCD_INTRUPT_BIT    = 1
@@ -36,8 +36,6 @@ const (
 func (ic *IntruptController) init(mmu *MMU, cpu *CPU) {
 	ic.mmu = mmu
 	ic.cpu = cpu
-	ic.intruptFlagReg = 0
-	ic.intruptEnableReg = 0
 }
 
 func (ic *IntruptController) contains(addr uint16) bool {
@@ -47,9 +45,9 @@ func (ic *IntruptController) contains(addr uint16) bool {
 func (ic *IntruptController) read(addr uint16) uint8 {
 	switch addr {
 	case IF_ADDR:
-		return ic.intruptFlagReg & INTRUPT_MSK
+		return ic.intruptFlagReg | INTRUPT_MSK
 	case IE_ADDR:
-		return ic.intruptEnableReg & INTRUPT_MSK
+		return ic.intruptEnableReg | INTRUPT_MSK
 	default:
 		log.Fatalf("MMU mapped an illegal read address: 0x%02x to interrupt controller", addr)
 		return 0xFF
@@ -59,9 +57,9 @@ func (ic *IntruptController) read(addr uint16) uint8 {
 func (ic *IntruptController) write(addr uint16, data uint8) {
 	switch addr {
 	case IF_ADDR:
-		ic.intruptFlagReg = data & INTRUPT_MSK
+		ic.intruptFlagReg = data | INTRUPT_MSK
 	case IE_ADDR:
-		ic.intruptEnableReg = data & INTRUPT_MSK
+		ic.intruptEnableReg = data | INTRUPT_MSK
 	default:
 		log.Fatalf("MMU mapped an illegal write address: 0x%02x to interrupt controller", addr)
 	}

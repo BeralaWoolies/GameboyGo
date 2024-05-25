@@ -36,18 +36,6 @@ func (cpu *CPU) init(mmu *MMU) {
 	cpu.reg = &Registers{}
 	cpu.mmu = mmu
 	cpu.cbInstructions = cpu.initCbInstructions()
-
-	cpu.reg.A = 0x01
-	cpu.reg.B = 0x00
-	cpu.reg.C = 0x13
-	cpu.reg.D = 0x00
-	cpu.reg.E = 0xD8
-	cpu.reg.F = 0xB0
-	cpu.reg.H = 0x01
-	cpu.reg.L = 0x4D
-	cpu.reg.SP = 0xFFFE
-	cpu.reg.PC = 0x100
-
 	cpu.ticks = 0
 	cpu.halted = false
 	cpu.IME = false

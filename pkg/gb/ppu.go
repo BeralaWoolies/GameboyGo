@@ -146,10 +146,6 @@ func (ppu *PPU) init(mmu *MMU, dmac *DMAController, ic *IntruptController) {
 	ppu.oam = [OAM_SIZE]uint8{}
 	ppu.spriteBuffer = make([]Sprite, 0, SPRITES_PER_SCANLINE)
 	ppu.setState(OAM_SCAN)
-	ppu.lcdc = 0
-	ppu.ticks = 0
-	ppu.ly = 0
-	ppu.lx = 0
 }
 
 func (ppu *PPU) step(cTicks int) {
@@ -406,6 +402,14 @@ func (ppu *PPU) incLY() {
 	} else {
 		ppu.stat = bits.Reset(ppu.stat, STAT_LYC)
 	}
+}
+
+func (ppu *PPU) setStatDirect(val uint8) {
+	ppu.stat = val
+}
+
+func (ppu *PPU) setDMADirect(val uint8) {
+	ppu.dma = val
 }
 
 func (ppu *PPU) contains(addr uint16) bool {

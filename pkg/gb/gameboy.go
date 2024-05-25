@@ -122,6 +122,8 @@ func (gb *Gameboy) Start() {
 	ebiten.SetVsyncEnabled(false)
 	ebiten.SetTPS(FPS)
 
+	gb.powerUpSequence()
+
 	if err := ebiten.RunGame(gb); err != nil {
 		log.Fatal(err)
 	}
@@ -152,6 +154,70 @@ func (gb *Gameboy) handleUIEvents() {
 	for kbKey, press := range gb.btnMappings {
 		press(ebiten.IsKeyPressed(kbKey))
 	}
+}
+
+func (gb *Gameboy) powerUpSequence() {
+	// cpu registers
+	gb.cpu.setA(0x01)
+	gb.cpu.setFlag(ZERO_FLAG_BIT, true)
+	gb.cpu.setFlag(SUB_FLAG_BIT, false)
+	gb.cpu.setFlag(HALF_CARRY_FLAG_BIT, true)
+	gb.cpu.setFlag(CARRY_FLAG_BIT, true)
+	gb.cpu.setB(0x00)
+	gb.cpu.setC(0x13)
+	gb.cpu.setD(0x00)
+	gb.cpu.setE(0xD8)
+	gb.cpu.setH(0x01)
+	gb.cpu.setL(0x4D)
+	gb.cpu.setPC(0x0100)
+	gb.cpu.setSP(0xFFFE)
+
+	// IO registers
+	gb.mmu.write(JOYP_ADDR, 0xCF)
+	gb.mmu.write(SB_ADDR, 0x00)
+	gb.mmu.write(SC_ADDR, 0x7E)
+	gb.timer.setDivDirect(0xAB) // set directly, since writes resets DIV
+	gb.mmu.write(TIMA_ADDR, 0x00)
+	gb.mmu.write(TMA_ADDR, 0x00)
+	gb.mmu.write(TAC_ADDR, 0xF8)
+	gb.mmu.write(IF_ADDR, 0xE1)
+
+	// audio registers
+	gb.mmu.write(0xFF10, 0x80)
+	gb.mmu.write(0xFF11, 0xBF)
+	gb.mmu.write(0xFF12, 0xF3)
+	gb.mmu.write(0xFF13, 0xFF)
+	gb.mmu.write(0xFF14, 0xBF)
+	gb.mmu.write(0xFF16, 0x3F)
+	gb.mmu.write(0xFF17, 0x00)
+	gb.mmu.write(0xFF18, 0xFF)
+	gb.mmu.write(0xFF19, 0xBF)
+	gb.mmu.write(0xFF1A, 0x7F)
+	gb.mmu.write(0xFF1B, 0xFF)
+	gb.mmu.write(0xFF1C, 0x9F)
+	gb.mmu.write(0xFF1D, 0xFF)
+	gb.mmu.write(0xFF1E, 0xBF)
+	gb.mmu.write(0xFF20, 0xFF)
+	gb.mmu.write(0xFF21, 0x00)
+	gb.mmu.write(0xFF22, 0x00)
+	gb.mmu.write(0xFF23, 0xBF)
+	gb.mmu.write(0xFF24, 0x77)
+	gb.mmu.write(0xFF25, 0xF3)
+	gb.mmu.write(0xFF26, 0xF1)
+
+	// ppu registers
+	gb.mmu.write(LCDC_ADDR, 0x91)
+	gb.ppu.setStatDirect(0x85)
+	gb.mmu.write(SCY_ADDR, 0x00)
+	gb.mmu.write(SCX_ADDR, 0x00)
+	gb.mmu.write(LY_ADDR, 0x00)
+	gb.mmu.write(LYC_ADDR, 0x00)
+	gb.ppu.setDMADirect(0xFF)
+	gb.mmu.write(BG_PALETTE_ADDR, 0xFC)
+	gb.mmu.write(WY_ADDR, 0x00)
+	gb.mmu.write(WX_ADDR, 0x00)
+
+	fmt.Println("Finished power up sequence...")
 }
 
 func (gb *Gameboy) Draw(screen *ebiten.Image) {

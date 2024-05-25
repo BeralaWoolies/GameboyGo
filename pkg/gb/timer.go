@@ -37,12 +37,6 @@ const (
 func (t *Timer) init(mmu *MMU, ic *IntruptController) {
 	t.mmu = mmu
 	t.ic = ic
-	t.div = 0xAB
-	t.tima = 0x0
-	t.tma = 0x0
-	t.tac = 0x0
-	t.divCounter = 0xCC
-	t.timaCounter = 0x0
 }
 
 func (t *Timer) contains(addr uint16) bool {
@@ -138,4 +132,12 @@ func (t *Timer) stepTIMA(cTicks int) {
 
 func (t *Timer) timerEnabled() bool {
 	return bits.IsSet(t.tac, TAC_TIMER_ENABLE_BIT)
+}
+
+func (t *Timer) setDivDirect(val uint8) {
+	if val == 0xAB {
+		t.divCounter = 0xCC
+	}
+
+	t.div = val
 }
