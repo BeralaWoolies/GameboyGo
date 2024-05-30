@@ -21,6 +21,7 @@ type Gameboy struct {
 	ic           *IntruptController
 	btnMappings  map[ebiten.Key]func(pressed bool)
 	debugMode    bool
+	fpsCounter   bool
 	screenWidth  int
 	screenHeight int
 	windowWidth  int
@@ -41,8 +42,8 @@ const (
 	TILE_MAP_SCREEN_HEIGHT = 256
 )
 
-func NewGameboy(filename string, debugMode bool) *Gameboy {
-	gb := &Gameboy{debugMode: debugMode}
+func NewGameboy(filename string, debugMode bool, fpsCounter bool) *Gameboy {
+	gb := &Gameboy{debugMode: debugMode, fpsCounter: fpsCounter}
 	gb.init(filename)
 
 	if debugMode {
@@ -136,8 +137,12 @@ func (gb *Gameboy) Start() {
 	ebiten.SetWindowSize(gb.windowWidth, gb.windowHeight)
 	ebiten.SetWindowTitle("GameboyGo")
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
-	ebiten.SetVsyncEnabled(false)
 	ebiten.SetTPS(FPS)
+	if !gb.debugMode {
+		ebiten.SetVsyncEnabled(true)
+	} else {
+		ebiten.SetVsyncEnabled(false)
+	}
 
 	gb.powerUpSequence()
 
@@ -239,12 +244,23 @@ func (gb *Gameboy) powerUpSequence() {
 
 func (gb *Gameboy) Draw(screen *ebiten.Image) {
 	if !gb.debugMode {
-		gb.ppu.updateGBScreen(screen, 0, 0)
+		gb.ppu.updateGBScreen(screen, &ebiten.DrawImageOptions{})
 	} else {
-		gb.ppu.updateGBScreen(screen, 0, (TILE_DATA_SCREEN_HEIGHT-GB_SCREEN_HEIGHT)/2)
+		opt := ebiten.DrawImageOptions{}
+		dbgOpt := ebiten.DrawImageOptions{}
+
+		opt.GeoM.Translate(0, (TILE_DATA_SCREEN_HEIGHT-GB_SCREEN_HEIGHT)/2)
+		gb.ppu.updateGBScreen(screen, &opt)
+
+		dbgOpt.GeoM.Translate(GB_SCREEN_WIDTH, 0)
+		gb.ppu.updateTileDataScreen(screen, &dbgOpt)
+
+		dbgOpt.GeoM.Translate(TILE_DATA_SCREEN_WIDTH, 0)
+		gb.ppu.updateTileMaps(screen, &dbgOpt)
+	}
+
+	if gb.fpsCounter {
 		ebitenutil.DebugPrint(screen, strconv.Itoa(int(ebiten.ActualFPS())))
-		gb.ppu.updateTileDataScreen(screen, GB_SCREEN_WIDTH, 0)
-		gb.ppu.updateTileMaps(screen, GB_SCREEN_WIDTH+TILE_DATA_SCREEN_WIDTH, 0)
 	}
 }
 

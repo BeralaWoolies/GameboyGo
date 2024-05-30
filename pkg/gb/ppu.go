@@ -11,11 +11,14 @@ import (
 )
 
 type PPU struct {
-	mmu         *MMU
-	dmac        *DMAController
-	ic          *IntruptController
-	pxF         *PixelFIFO
-	frameBuffer [GB_SCREEN_WIDTH][GB_SCREEN_HEIGHT]color.RGBA
+	mmu               *MMU
+	dmac              *DMAController
+	ic                *IntruptController
+	pxF               *PixelFIFO
+	frontBuffer       *ebiten.Image
+	backBuffer        *ebiten.Image
+	dbgTileDataBuffer *ebiten.Image
+	dbgTileMapBuffer  *ebiten.Image
 
 	vram          [VRAM_SIZE]uint8
 	oam           [OAM_SIZE]uint8
@@ -109,25 +112,25 @@ const (
 )
 
 var pallete = [4]color.RGBA{
-	0: color.RGBA{
+	0: {
 		R: 208,
 		G: 208,
 		B: 88,
 		A: 255,
 	},
-	1: color.RGBA{
+	1: {
 		R: 160,
 		G: 168,
 		B: 64,
 		A: 255,
 	},
-	2: color.RGBA{
+	2: {
 		R: 112,
 		G: 128,
 		B: 40,
 		A: 255,
 	},
-	3: color.RGBA{
+	3: {
 		R: 64,
 		G: 80,
 		B: 16,
@@ -141,7 +144,10 @@ func (ppu *PPU) init(mmu *MMU, dmac *DMAController, ic *IntruptController) {
 	ppu.ic = ic
 	ppu.pxF = &PixelFIFO{}
 	ppu.pxF.init(ppu)
-	ppu.frameBuffer = [GB_SCREEN_WIDTH][GB_SCREEN_HEIGHT]color.RGBA{}
+	ppu.frontBuffer = ebiten.NewImage(GB_SCREEN_WIDTH, GB_SCREEN_HEIGHT)
+	ppu.backBuffer = ebiten.NewImage(GB_SCREEN_WIDTH, GB_SCREEN_HEIGHT)
+	ppu.dbgTileDataBuffer = ebiten.NewImage(TILE_DATA_SCREEN_WIDTH, TILE_DATA_SCREEN_HEIGHT)
+	ppu.dbgTileMapBuffer = ebiten.NewImage(2*TILE_MAP_SCREEN_WIDTH, TILE_MAP_SCREEN_HEIGHT)
 
 	ppu.vram = [VRAM_SIZE]uint8{}
 	ppu.oam = [OAM_SIZE]uint8{}
@@ -199,7 +205,7 @@ func (ppu *PPU) tick() {
 				color = getLCDColor(ppu.spPalettes[1], pxFItem.color)
 			}
 
-			ppu.frameBuffer[ppu.lx][ppu.ly] = color
+			ppu.backBuffer.Set(int(ppu.lx), int(ppu.ly), color)
 			ppu.lx++
 		}
 
@@ -361,12 +367,17 @@ func (ppu *PPU) updateStat(state PPUState) {
 			ppu.ic.requestIntrupt(LCD_INTRUPT_BIT)
 		}
 	case VBLANK:
+		ppu.swapBuffers()
 		ppu.ic.requestIntrupt(VBLANK_INTRUPT_BIT)
 
 		if bits.IsSet(ppu.stat, STAT_SELECT_VBLANK) {
 			ppu.ic.requestIntrupt(LCD_INTRUPT_BIT)
 		}
 	}
+}
+
+func (ppu *PPU) swapBuffers() {
+	ppu.backBuffer, ppu.frontBuffer = ppu.frontBuffer, ppu.backBuffer
 }
 
 func (ppu *PPU) getBGTileMap() uint16 {
@@ -508,15 +519,11 @@ func (ppu *PPU) read(addr uint16) uint8 {
 	}
 }
 
-func (ppu *PPU) updateGBScreen(screen *ebiten.Image, xOff int, yOff int) {
-	for y := 0; y < GB_SCREEN_HEIGHT; y++ {
-		for x := 0; x < GB_SCREEN_WIDTH; x++ {
-			screen.Set(x+xOff, y+yOff, ppu.frameBuffer[x][y])
-		}
-	}
+func (ppu *PPU) updateGBScreen(screen *ebiten.Image, opt *ebiten.DrawImageOptions) {
+	screen.DrawImage(ppu.frontBuffer, opt)
 }
 
-func (ppu *PPU) writeTile(screen *ebiten.Image, tileId uint16, x int, y int) {
+func (ppu *PPU) writeTile(buffer *ebiten.Image, tileId uint16, x int, y int) {
 	addr, unsig := ppu.getTileDataArea()
 	addr -= VRAM_BASE
 
@@ -532,7 +539,7 @@ func (ppu *PPU) writeTile(screen *ebiten.Image, tileId uint16, x int, y int) {
 
 		for bit := 7; bit >= 0; bit-- {
 			color := getLCDColor(ppu.bgPalette, getColor(loByte, hiByte, uint8(bit)))
-			screen.Set(x+(7-bit), y+(tileRow/2), color)
+			buffer.Set(x+(7-bit), y+(tileRow/2), color)
 		}
 	}
 }
@@ -549,18 +556,20 @@ func getLCDColor(pal uint8, color uint8) color.RGBA {
 }
 
 // ============================= Debug Functions ===============================
-func (ppu *PPU) updateTileDataScreen(screen *ebiten.Image, xOff int, yOff int) {
+func (ppu *PPU) updateTileDataScreen(screen *ebiten.Image, opt *ebiten.DrawImageOptions) {
 	var tileId uint16 = 0
 
 	for y := 0; y < TILE_DATA_SCREEN_HEIGHT/TILE_WIDTH; y++ {
 		for x := 0; x < TILE_DATA_SCREEN_WIDTH/TILE_WIDTH; x++ {
-			ppu.writeTile(screen, tileId, xOff+(x*TILE_WIDTH), yOff+(y*TILE_WIDTH))
+			ppu.writeTile(ppu.dbgTileDataBuffer, tileId, (x * TILE_WIDTH), (y * TILE_WIDTH))
 			tileId++
 		}
 	}
+
+	screen.DrawImage(ppu.dbgTileDataBuffer, opt)
 }
 
-func (ppu *PPU) updateTileMaps(screen *ebiten.Image, xOff int, yOff int) {
+func (ppu *PPU) updateTileMaps(screen *ebiten.Image, opt *ebiten.DrawImageOptions) {
 	var tileMap1 uint16 = 0x9800
 	var tileMap2 uint16 = 0x9C00
 
@@ -569,8 +578,10 @@ func (ppu *PPU) updateTileMaps(screen *ebiten.Image, xOff int, yOff int) {
 			tileMap1Addr := tileMap1 + uint16(y)*TILE_MAP_WIDTH + uint16(x)
 			tileMap2Addr := tileMap2 + uint16(y)*TILE_MAP_WIDTH + uint16(x)
 
-			ppu.writeTile(screen, uint16(ppu.vram[tileMap1Addr-VRAM_BASE]), xOff+(x*TILE_WIDTH), yOff+(y*TILE_WIDTH))
-			ppu.writeTile(screen, uint16(ppu.vram[tileMap2Addr-VRAM_BASE]), xOff+TILE_MAP_SCREEN_WIDTH+(x*TILE_WIDTH), yOff+(y*TILE_WIDTH))
+			ppu.writeTile(ppu.dbgTileMapBuffer, uint16(ppu.vram[tileMap1Addr-VRAM_BASE]), (x * TILE_WIDTH), (y * TILE_WIDTH))
+			ppu.writeTile(ppu.dbgTileMapBuffer, uint16(ppu.vram[tileMap2Addr-VRAM_BASE]), TILE_MAP_SCREEN_WIDTH+(x*TILE_WIDTH), (y * TILE_WIDTH))
 		}
 	}
+
+	screen.DrawImage(ppu.dbgTileMapBuffer, opt)
 }
