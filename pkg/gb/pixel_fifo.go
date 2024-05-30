@@ -203,7 +203,6 @@ func (pxF *PixelFIFO) tick() {
 				} else {
 					pxF.bgFetchX++
 				}
-				pxF.setState(ReadTileID)
 			}
 
 			if !pxF.spriteFetchFIFO.IsEmpty() {
@@ -213,11 +212,10 @@ func (pxF *PixelFIFO) tick() {
 				pxF.cacheTileLoByte = pxF.tileLoByte
 				pxF.cacheTileHiByte = pxF.tileHiByte
 				pxF.cacheTileLine = pxF.tileLine
-
-				pxF.setState(ReadTileID)
 			}
-		}
 
+			pxF.setState(ReadTileID)
+		}
 	}
 }
 

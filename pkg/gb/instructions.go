@@ -1,6 +1,8 @@
 package gb
 
 import (
+	"log"
+
 	"github.com/BeralaWoolies/GameboyGo/pkg/bits"
 )
 
@@ -1553,6 +1555,9 @@ var instructions = [0x100]func(cpu *CPU){
 	0xFF: func(cpu *CPU) {
 		// RST $38
 		// fmt.Println("Decoded OPCODE: RST $38")
+		if cpu.mmu.read(0x0038) == 0xFF {
+			log.Fatal("RST $38 loop")
+		}
 		cpu.instrCall(0x0038)
 	},
 }

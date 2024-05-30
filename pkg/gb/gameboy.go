@@ -16,6 +16,7 @@ type Gameboy struct {
 	joyp        *Joypad
 	serial      *SerialPort
 	timer       *Timer
+	cart        *Cart
 	dmac        *DMAController
 	ic          *IntruptController
 	btnMappings map[ebiten.Key]func(pressed bool)
@@ -48,18 +49,19 @@ func NewGameboy(filename string) *Gameboy {
 }
 
 func (gb *Gameboy) init(filename string) {
-	gb.initHardware()
-	gb.initMemoryMap(filename)
+	gb.initHardware(filename)
+	gb.initMemoryMap()
 	gb.bindUIEvents()
 }
 
-func (gb *Gameboy) initHardware() {
+func (gb *Gameboy) initHardware(filename string) {
 	gb.mmu = &MMU{}
 	gb.cpu = &CPU{}
 	gb.ppu = &PPU{}
 	gb.joyp = &Joypad{}
 	gb.serial = &SerialPort{}
 	gb.timer = &Timer{}
+	gb.cart = &Cart{}
 	gb.dmac = &DMAController{}
 	gb.ic = &IntruptController{}
 
@@ -68,13 +70,14 @@ func (gb *Gameboy) initHardware() {
 	gb.joyp.init(gb.ic)
 	gb.serial.init(gb.ic)
 	gb.timer.init(gb.mmu, gb.ic)
+	gb.cart.load(filename)
 	gb.dmac.init(gb.mmu)
 	gb.ic.init(gb.mmu, gb.cpu)
 }
 
-func (gb *Gameboy) initMemoryMap(filename string) {
+func (gb *Gameboy) initMemoryMap() {
 	gb.mmu.mapAddrSpace(newBootROM("boot_rom.bin", gb.mmu))
-	gb.mmu.mapAddrSpace(newROM(filename))
+	gb.mmu.mapAddrSpace(gb.cart)
 	gb.mmu.mapAddrSpace(gb.ppu)
 	gb.mmu.mapAddrSpace(gb.joyp)
 	gb.mmu.mapAddrSpace(gb.serial)
@@ -94,8 +97,8 @@ func (gb *Gameboy) bindUIEvents() {
 		ebiten.KeyArrowDown:  gb.joyp.down.press,
 		ebiten.KeyArrowRight: gb.joyp.right.press,
 		ebiten.KeyArrowLeft:  gb.joyp.left.press,
-		ebiten.KeyA:          gb.joyp.a.press,
-		ebiten.KeyS:          gb.joyp.b.press,
+		ebiten.KeyA:          gb.joyp.b.press,
+		ebiten.KeyS:          gb.joyp.a.press,
 		ebiten.KeySpace:      gb.joyp.sel.press,
 		ebiten.KeyEnter:      gb.joyp.start.press,
 	}
@@ -116,6 +119,8 @@ func (gb *Gameboy) printRegisters() {
 }
 
 func (gb *Gameboy) Start() {
+	fmt.Println("Starting...")
+
 	ebiten.SetWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT)
 	ebiten.SetWindowTitle("GameboyGo")
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)

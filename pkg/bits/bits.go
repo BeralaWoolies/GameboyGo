@@ -1,5 +1,7 @@
 package bits
 
+import "fmt"
+
 func Set(val uint8, pos uint8) uint8 {
 	return val | (1 << pos)
 }
@@ -42,4 +44,17 @@ func IsSet(val uint8, pos uint8) bool {
 
 func GetBit(val uint8, pos uint8) uint8 {
 	return (val >> pos) & 1
+}
+
+func HexString(val int) string {
+	return fmt.Sprintf("0x%02x", val)
+}
+
+func NBitMask(n uint8) uint8 {
+	res := uint8(0)
+	for bit := 0; bit < int(n); bit++ {
+		res |= (1 << bit)
+	}
+
+	return res
 }
