@@ -10,24 +10,26 @@ import (
 )
 
 type Gameboy struct {
-	mmu         *MMU
-	cpu         *CPU
-	ppu         *PPU
-	joyp        *Joypad
-	serial      *SerialPort
-	timer       *Timer
-	cart        *Cart
-	dmac        *DMAController
-	ic          *IntruptController
-	btnMappings map[ebiten.Key]func(pressed bool)
+	mmu          *MMU
+	cpu          *CPU
+	ppu          *PPU
+	joyp         *Joypad
+	serial       *SerialPort
+	timer        *Timer
+	cart         *Cart
+	dmac         *DMAController
+	ic           *IntruptController
+	btnMappings  map[ebiten.Key]func(pressed bool)
+	debugMode    bool
+	screenWidth  int
+	screenHeight int
+	windowWidth  int
+	windowHeight int
 }
 
 const (
 	FPS             = 60
 	TICKS_PER_FRAME = TICKS_PER_SCANLINE * SCANLINES_PER_FRAME
-
-	SCREEN_WIDTH  = GB_SCREEN_WIDTH + TILE_DATA_SCREEN_WIDTH + (2 * TILE_MAP_SCREEN_WIDTH)
-	SCREEN_HEIGHT = max(GB_SCREEN_HEIGHT, TILE_DATA_SCREEN_HEIGHT, TILE_MAP_SCREEN_HEIGHT)
 
 	GB_SCREEN_WIDTH  = 160
 	GB_SCREEN_HEIGHT = 144
@@ -37,14 +39,24 @@ const (
 
 	TILE_MAP_SCREEN_WIDTH  = 256
 	TILE_MAP_SCREEN_HEIGHT = 256
-
-	WINDOW_WIDTH  = SCREEN_WIDTH * 3
-	WINDOW_HEIGHT = SCREEN_HEIGHT * 3
 )
 
-func NewGameboy(filename string) *Gameboy {
-	gb := &Gameboy{}
+func NewGameboy(filename string, debugMode bool) *Gameboy {
+	gb := &Gameboy{debugMode: debugMode}
 	gb.init(filename)
+
+	if debugMode {
+		gb.screenWidth = GB_SCREEN_WIDTH + TILE_DATA_SCREEN_WIDTH + (2 * TILE_MAP_SCREEN_WIDTH)
+		gb.screenHeight = max(GB_SCREEN_HEIGHT, TILE_DATA_SCREEN_HEIGHT, TILE_MAP_SCREEN_HEIGHT)
+		gb.windowWidth = gb.screenWidth * 3
+		gb.windowHeight = gb.screenHeight * 3
+	} else {
+		gb.screenWidth = GB_SCREEN_WIDTH
+		gb.screenHeight = GB_SCREEN_HEIGHT
+		gb.windowWidth = gb.screenWidth * 4
+		gb.windowHeight = gb.screenHeight * 4
+	}
+
 	return gb
 }
 
@@ -121,7 +133,7 @@ func (gb *Gameboy) printRegisters() {
 func (gb *Gameboy) Start() {
 	fmt.Println("Starting...")
 
-	ebiten.SetWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT)
+	ebiten.SetWindowSize(gb.windowWidth, gb.windowHeight)
 	ebiten.SetWindowTitle("GameboyGo")
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	ebiten.SetVsyncEnabled(false)
@@ -226,12 +238,16 @@ func (gb *Gameboy) powerUpSequence() {
 }
 
 func (gb *Gameboy) Draw(screen *ebiten.Image) {
-	gb.ppu.updateGBScreen(screen, 0, (TILE_DATA_SCREEN_HEIGHT-GB_SCREEN_HEIGHT)/2)
-	ebitenutil.DebugPrint(screen, strconv.Itoa(int(ebiten.ActualFPS())))
-	gb.ppu.updateTileDataScreen(screen, GB_SCREEN_WIDTH, 0)
-	gb.ppu.updateTileMaps(screen, GB_SCREEN_WIDTH+TILE_DATA_SCREEN_WIDTH, 0)
+	if !gb.debugMode {
+		gb.ppu.updateGBScreen(screen, 0, 0)
+	} else {
+		gb.ppu.updateGBScreen(screen, 0, (TILE_DATA_SCREEN_HEIGHT-GB_SCREEN_HEIGHT)/2)
+		ebitenutil.DebugPrint(screen, strconv.Itoa(int(ebiten.ActualFPS())))
+		gb.ppu.updateTileDataScreen(screen, GB_SCREEN_WIDTH, 0)
+		gb.ppu.updateTileMaps(screen, GB_SCREEN_WIDTH+TILE_DATA_SCREEN_WIDTH, 0)
+	}
 }
 
 func (gb *Gameboy) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
-	return SCREEN_WIDTH, SCREEN_HEIGHT
+	return gb.screenWidth, gb.screenHeight
 }

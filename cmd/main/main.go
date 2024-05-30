@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"os"
 
@@ -13,7 +14,10 @@ func main() {
 		log.Fatalf("Usage: go run %s myrom.gb", os.Args[0])
 	}
 
-	rom := args[0]
-	gameboy := gb.NewGameboy(rom)
+	rom := flag.String("rom", "", "specify a .gb rom")
+	debugMode := flag.Bool("d", false, "specify -d to enable debug mode")
+	flag.Parse()
+
+	gameboy := gb.NewGameboy(*rom, *debugMode)
 	gameboy.Start()
 }
