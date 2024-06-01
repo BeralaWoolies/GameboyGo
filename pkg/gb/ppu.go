@@ -40,10 +40,9 @@ type PPU struct {
 	wx         uint8
 	wly        uint8
 
-	currState  PPUState
-	lx         uint8
-	inWindow   bool
-	scxDropped uint8
+	currState PPUState
+	lx        uint8
+	inWindow  bool
 }
 
 type PPUState uint8
@@ -193,7 +192,7 @@ func (ppu *PPU) tick() {
 
 		ppu.pxF.tick()
 
-		if pxFItem, err := ppu.pxF.pop(); err == nil && ppu.handleSCXDrop() {
+		if pxFItem, err := ppu.pxF.pop(); err == nil {
 			var color color.RGBA
 
 			switch pxFItem.palette {
@@ -247,15 +246,6 @@ func (ppu *PPU) tick() {
 	default:
 		log.Fatalf("PPU is in an unimplemented state")
 	}
-}
-
-func (ppu *PPU) handleSCXDrop() bool {
-	if ppu.scxDropped < ppu.scx%8 {
-		ppu.scxDropped++
-		return false
-	}
-
-	return true
 }
 
 func (ppu *PPU) scanOAM() {
@@ -360,7 +350,6 @@ func (ppu *PPU) updateStat(state PPUState) {
 		}
 	case PIXEL_TRANSFER:
 		ppu.lx = 0
-		ppu.scxDropped = 0
 		ppu.pxF.start()
 	case HBLANK:
 		if bits.IsSet(ppu.stat, STAT_SELECT_HBLANK) {

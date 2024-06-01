@@ -33,6 +33,7 @@ type PixelFIFO struct {
 	sprite        Sprite
 
 	windowFetch bool
+	scxDropped  uint8
 }
 type PixelFIFOState uint8
 
@@ -196,6 +197,10 @@ func (pxF *PixelFIFO) tick() {
 			pushed := false
 			if pxF.bgFIFO.IsEmpty() {
 				for bit := 7; bit >= 0; bit-- {
+					if pxF.dropSCX() {
+						continue
+					}
+
 					pxF.bgFIFO.Add(PixelFIFOItem{
 						color:      getColor(pxF.tileLoByte, pxF.tileHiByte, uint8(bit)),
 						bgPriority: false,
@@ -235,6 +240,16 @@ func (pxF *PixelFIFO) start() {
 	pxF.tileLine = pxF.tileMapY % TILE_WIDTH
 	pxF.bgFetchX = 0
 	pxF.ticks = 0
+	pxF.scxDropped = 0
+}
+
+func (pxF *PixelFIFO) dropSCX() bool {
+	if pxF.scxDropped < pxF.ppu.scx%8 {
+		pxF.scxDropped++
+		return true
+	}
+
+	return false
 }
 
 func (pxF *PixelFIFO) startWinFetch() {
