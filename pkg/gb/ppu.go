@@ -43,6 +43,7 @@ type PPU struct {
 	currState PPUState
 	lx        uint8
 	inWindow  bool
+	disabled  bool
 }
 
 type PPUState uint8
@@ -99,6 +100,7 @@ const (
 	LCDC_TILE_DATA_AREA = 4
 	LCDC_WIN_ENABLE     = 5
 	LCDC_WIN_TILE_MAP   = 6
+	LCDC_LCD_ENABLE     = 7
 
 	SPRITES_PER_SCANLINE = 10
 
@@ -150,6 +152,10 @@ func (ppu *PPU) step(cTicks int) {
 }
 
 func (ppu *PPU) tick() {
+	if ppu.disabled {
+		return
+	}
+
 	ppu.ticks++
 
 	switch ppu.currState {
@@ -235,6 +241,10 @@ func (ppu *PPU) tick() {
 	default:
 		log.Fatalf("PPU is in an unimplemented state")
 	}
+}
+
+func (ppu *PPU) LCDEnabled() bool {
+	return bits.IsSet(ppu.lcdc, LCDC_LCD_ENABLE)
 }
 
 func (ppu *PPU) scanOAM() {
@@ -430,6 +440,16 @@ func (ppu *PPU) write(addr uint16, data uint8) {
 	switch addr {
 	case LCDC_ADDR:
 		ppu.lcdc = data
+
+		if !ppu.LCDEnabled() {
+			ppu.disabled = true
+			ppu.resetLY()
+			ppu.resetTicks()
+			ppu.setState(HBLANK)
+		} else if ppu.disabled {
+			ppu.disabled = false
+			ppu.setState(OAM_SCAN)
+		}
 	case STAT_ADDR:
 		ppu.stat = (data & STAT_RW_MSK) | 0x80
 	case SCY_ADDR:
