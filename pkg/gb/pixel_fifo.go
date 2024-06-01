@@ -171,6 +171,12 @@ func (pxF *PixelFIFO) tick() {
 				}
 			}
 
+			if pxF.sprite.x < 8 {
+				for i := 0; i < int(8-pxF.sprite.x); i++ {
+					pxF.spriteFIFO.Remove()
+				}
+			}
+
 			// Check if we need to fetch another sprite
 			pxF.setState(ReadTileID)
 			if pxF.spriteFetchFIFO.IsEmpty() {

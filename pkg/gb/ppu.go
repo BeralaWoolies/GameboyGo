@@ -272,7 +272,7 @@ func (ppu *PPU) scanOAM() {
 	spriteTileId := ppu.mmu.read(ppu.oamScan + 2)
 	spriteFlags := ppu.mmu.read(ppu.oamScan + 3)
 
-	if spriteX > 0 && ppu.ly >= spriteY-16 && ppu.ly < spriteY+ppu.getSpriteHeight()-16 {
+	if ppu.ly+16 >= spriteY && ppu.ly+16 < spriteY+ppu.getSpriteHeight() {
 		ppu.spriteBuffer = append(ppu.spriteBuffer, Sprite{
 			x:      spriteX,
 			y:      spriteY,
@@ -319,7 +319,7 @@ func (ppu *PPU) spritesEnabled() bool {
 
 func (ppu *PPU) spriteEncountered() bool {
 	for _, sprite := range ppu.spriteBuffer {
-		if sprite.x-8 <= ppu.lx {
+		if sprite.x <= ppu.lx+8 {
 			return true
 		}
 	}
