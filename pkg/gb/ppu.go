@@ -111,30 +111,19 @@ const (
 )
 
 var pallete = [4]color.RGBA{
-	0: {
-		R: 208,
-		G: 208,
-		B: 88,
+	0: hexToRGBA(0xd0d058),
+	1: hexToRGBA(0xa0a840),
+	2: hexToRGBA(0x708028),
+	3: hexToRGBA(0x405010),
+}
+
+func hexToRGBA(hex int) color.RGBA {
+	return color.RGBA{
+		R: uint8((hex >> 16) & 0xFF),
+		G: uint8((hex >> 8) & 0xFF),
+		B: uint8(hex & 0xFF),
 		A: 255,
-	},
-	1: {
-		R: 160,
-		G: 168,
-		B: 64,
-		A: 255,
-	},
-	2: {
-		R: 112,
-		G: 128,
-		B: 40,
-		A: 255,
-	},
-	3: {
-		R: 64,
-		G: 80,
-		B: 16,
-		A: 255,
-	},
+	}
 }
 
 func (ppu *PPU) init(mmu *MMU, dmac *DMAController, ic *IntruptController) {
