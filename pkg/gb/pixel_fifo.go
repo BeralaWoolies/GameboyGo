@@ -88,13 +88,13 @@ func (pxF *PixelFIFO) tick() {
 
 			if pxF.ppu.getSpriteHeight() == 16 {
 				if pxF.sprite.flippedY() {
-					if pxF.ppu.ly <= pxF.sprite.y-8 {
+					if pxF.ppu.ly < pxF.sprite.y-8 {
 						pxF.tileId |= 0x01
 					} else {
 						pxF.tileId &= 0xFE
 					}
 				} else {
-					if pxF.ppu.ly <= pxF.sprite.y-8 {
+					if pxF.ppu.ly < pxF.sprite.y-8 {
 						pxF.tileId &= 0xFE
 					} else {
 						pxF.tileId |= 0x01
