@@ -34,6 +34,7 @@ type PixelFIFO struct {
 
 	windowFetch bool
 	scxDropped  uint8
+	wxDropped   uint8
 }
 type PixelFIFOState uint8
 
@@ -197,7 +198,11 @@ func (pxF *PixelFIFO) tick() {
 			pushed := false
 			if pxF.bgFIFO.IsEmpty() {
 				for bit := 7; bit >= 0; bit-- {
-					if pxF.dropSCX() {
+					if !pxF.windowFetch && pxF.dropSCX() {
+						continue
+					}
+
+					if pxF.windowFetch && pxF.dropWX() {
 						continue
 					}
 
@@ -236,16 +241,28 @@ func (pxF *PixelFIFO) start() {
 	pxF.spriteFIFO.Clear()
 	pxF.spriteFetchFIFO.Clear()
 	pxF.spriteFetch = false
+	pxF.windowFetch = false
 	pxF.tileMapY = uint16(pxF.ppu.ly + pxF.ppu.scy)
 	pxF.tileLine = pxF.tileMapY % TILE_WIDTH
 	pxF.bgFetchX = 0
+	pxF.winFetchX = 0
 	pxF.ticks = 0
 	pxF.scxDropped = 0
+	pxF.wxDropped = 0
 }
 
 func (pxF *PixelFIFO) dropSCX() bool {
 	if pxF.scxDropped < pxF.ppu.scx%8 {
 		pxF.scxDropped++
+		return true
+	}
+
+	return false
+}
+
+func (pxF *PixelFIFO) dropWX() bool {
+	if pxF.ppu.wx < 7 && pxF.wxDropped < 7-pxF.ppu.wx {
+		pxF.wxDropped++
 		return true
 	}
 
@@ -264,6 +281,7 @@ func (pxF *PixelFIFO) startWinFetch() {
 func (pxF *PixelFIFO) startBGFetch() {
 	pxF.currState = ReadTileID
 	pxF.bgFIFO.Clear()
+	pxF.bgFetchX = 0
 	pxF.windowFetch = false
 	pxF.tileMapY = uint16(pxF.ppu.ly + pxF.ppu.scy)
 	pxF.tileLine = pxF.tileMapY % TILE_WIDTH

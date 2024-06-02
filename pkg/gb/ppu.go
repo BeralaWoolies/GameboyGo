@@ -216,9 +216,7 @@ func (ppu *PPU) tick() {
 			ppu.resetTicks()
 			ppu.incLY()
 
-			if ppu.winEnabled() && ppu.wy == ppu.ly {
-				ppu.inWindow = true
-			}
+			ppu.latchWindow()
 
 			if ppu.ly >= GB_SCREEN_HEIGHT {
 				ppu.inWindow = false
@@ -235,11 +233,18 @@ func (ppu *PPU) tick() {
 
 			if ppu.ly >= SCANLINES_PER_FRAME {
 				ppu.resetLY()
+				ppu.latchWindow()
 				ppu.setState(OAM_SCAN)
 			}
 		}
 	default:
 		log.Fatalf("PPU is in an unimplemented state")
+	}
+}
+
+func (ppu *PPU) latchWindow() {
+	if ppu.winEnabled() && ppu.wy == ppu.ly {
+		ppu.inWindow = true
 	}
 }
 
@@ -317,7 +322,7 @@ func (ppu *PPU) spriteEncountered() bool {
 }
 
 func (ppu *PPU) winEncountered() bool {
-	return ppu.inWindow && ppu.lx >= ppu.wx-7
+	return ppu.inWindow && ppu.lx+7 >= ppu.wx
 }
 
 func (ppu *PPU) bgWinEnabled() bool {
