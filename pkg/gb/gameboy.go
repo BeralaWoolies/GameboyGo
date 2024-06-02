@@ -110,8 +110,8 @@ func (gb *Gameboy) bindUIEvents() {
 		ebiten.KeyArrowDown:  gb.joyp.down.press,
 		ebiten.KeyArrowRight: gb.joyp.right.press,
 		ebiten.KeyArrowLeft:  gb.joyp.left.press,
-		ebiten.KeyA:          gb.joyp.b.press,
-		ebiten.KeyS:          gb.joyp.a.press,
+		ebiten.KeyA:          gb.joyp.a.press,
+		ebiten.KeyS:          gb.joyp.b.press,
 		ebiten.KeySpace:      gb.joyp.sel.press,
 		ebiten.KeyEnter:      gb.joyp.start.press,
 	}
