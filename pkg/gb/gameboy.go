@@ -135,7 +135,7 @@ func (gb *Gameboy) Start() {
 	fmt.Println("Starting...")
 
 	ebiten.SetWindowSize(gb.windowWidth, gb.windowHeight)
-	ebiten.SetWindowTitle("GameboyGo")
+	ebiten.SetWindowTitle(fmt.Sprintf("GameboyGo - %s", gb.cart.title))
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	ebiten.SetTPS(FPS)
 	if !gb.debugMode {

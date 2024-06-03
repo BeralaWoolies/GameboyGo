@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/BeralaWoolies/GameboyGo/pkg/bits"
 )
@@ -12,6 +13,7 @@ type Cart struct {
 	rom     []byte
 	romSize uint32
 	ramSize uint32
+	title   string
 
 	mbc      *MBC1
 	cartType uint8
@@ -91,13 +93,17 @@ func (c *Cart) parseHeader() {
 		log.Fatal("Invalid gameboy cartridge")
 	}
 
+	c.title = strings.ReplaceAll(string(c.rom[0x0134:0x0144]), "\x00", "")
+	if c.title == "" {
+		c.title = "Unknown Title"
+	}
 	c.cartType = c.rom[0x0147]
 	c.romSize = 32 * (1 << c.rom[0x0148]) * 1024
 	c.ramSize = ramSizes[c.rom[0x0149]]
 	c.ram = c.ramSize != 0
 
 	fmt.Println("========= Cartridge Header =========")
-	fmt.Println("Title: ", string(c.rom[0x0134:0x0144]))
+	fmt.Println("Title: ", c.title)
 	fmt.Println("Manufacturer code: ", string(c.rom[0x013F:0x0143]))
 	fmt.Println("CGB Flag: ", bits.HexString(int(c.rom[0x0143])))
 	fmt.Println("Licensee code: ", string(c.rom[0x0144:0x0146]))
