@@ -16,9 +16,8 @@ func main() {
 
 	rom := flag.String("rom", "", "specify a .gb rom")
 	debugMode := flag.Bool("d", false, "specify -d to enable debug mode")
-	fpsCounter := flag.Bool("fps", false, "specify -fps to show FPS counter")
 	flag.Parse()
 
-	gameboy := gb.NewGameboy(*rom, *debugMode, *fpsCounter)
+	gameboy := gb.NewGameboy(*rom, *debugMode)
 	gameboy.Start()
 }

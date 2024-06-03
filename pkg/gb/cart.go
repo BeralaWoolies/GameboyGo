@@ -7,18 +7,21 @@ import (
 	"strings"
 
 	"github.com/BeralaWoolies/GameboyGo/pkg/bits"
+	"github.com/edsrzf/mmap-go"
 )
 
 type Cart struct {
-	rom     []byte
-	romSize uint32
-	ramSize uint32
-	title   string
+	rom         []byte
+	ram         mmap.MMap
+	romSize     uint32
+	ramSize     uint32
+	title       string
+	savFilename string
 
 	mbc      *MBC1
 	cartType uint8
 
-	ram     bool
+	hasRam  bool
 	battery bool
 }
 
@@ -82,10 +85,46 @@ func (c *Cart) load(filename string) {
 	}
 
 	c.rom = rom
+	c.ram = make([]byte, c.ramSize, c.ramSize)
 	c.mbc = &MBC1{}
-
 	c.parseHeader()
+
+	if c.battery {
+		c.ram = c.loadSave(filename)
+	}
+
 	c.mbc.init(c)
+}
+
+func (c *Cart) loadSave(filename string) mmap.MMap {
+	c.savFilename = fmt.Sprintf("%s.sav", strings.TrimSuffix(filename, ".gb"))
+	sav, err := os.OpenFile(c.savFilename, os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer sav.Close()
+
+	if err := sav.Truncate(int64(c.ramSize)); err != nil {
+		log.Fatal(err)
+	}
+
+	sram, err := mmap.Map(sav, mmap.RDWR, 0)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return sram
+}
+
+func (c *Cart) syncSave() {
+	if !c.battery {
+		return
+	}
+
+	c.ram.Flush()
+	c.ram.Unmap()
+	fmt.Printf("Flushed save to %s\n", c.savFilename)
 }
 
 func (c *Cart) parseHeader() {
@@ -97,10 +136,12 @@ func (c *Cart) parseHeader() {
 	if c.title == "" {
 		c.title = "Unknown Title"
 	}
+
 	c.cartType = c.rom[0x0147]
+	c.battery = strings.Contains(strings.ToLower(cartTypes[int(c.cartType)]), "battery")
 	c.romSize = 32 * (1 << c.rom[0x0148]) * 1024
 	c.ramSize = ramSizes[c.rom[0x0149]]
-	c.ram = c.ramSize != 0
+	c.hasRam = c.ramSize != 0
 
 	fmt.Println("========= Cartridge Header =========")
 	fmt.Println("Title: ", c.title)

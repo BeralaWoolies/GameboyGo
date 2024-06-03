@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
 type Gameboy struct {
@@ -21,11 +21,11 @@ type Gameboy struct {
 	ic           *IntruptController
 	btnMappings  map[ebiten.Key]func(pressed bool)
 	debugMode    bool
-	fpsCounter   bool
 	screenWidth  int
 	screenHeight int
 	windowWidth  int
 	windowHeight int
+	speedUp      bool
 }
 
 const (
@@ -42,8 +42,8 @@ const (
 	TILE_MAP_SCREEN_HEIGHT = 256
 )
 
-func NewGameboy(filename string, debugMode bool, fpsCounter bool) *Gameboy {
-	gb := &Gameboy{debugMode: debugMode, fpsCounter: fpsCounter}
+func NewGameboy(filename string, debugMode bool) *Gameboy {
+	gb := &Gameboy{debugMode: debugMode}
 	gb.init(filename)
 
 	if debugMode {
@@ -114,6 +114,17 @@ func (gb *Gameboy) bindUIEvents() {
 		ebiten.KeyS:          gb.joyp.b.press,
 		ebiten.KeySpace:      gb.joyp.sel.press,
 		ebiten.KeyEnter:      gb.joyp.start.press,
+		ebiten.KeyD:          gb.setSpeed,
+	}
+}
+
+func (gb *Gameboy) setSpeed(speedUp bool) {
+	gb.speedUp = speedUp
+
+	if gb.speedUp {
+		ebiten.SetTPS(FPS * 2)
+	} else {
+		ebiten.SetTPS(FPS)
 	}
 }
 
@@ -143,6 +154,8 @@ func (gb *Gameboy) Start() {
 	} else {
 		ebiten.SetVsyncEnabled(false)
 	}
+
+	defer gb.cart.syncSave()
 
 	gb.powerUpSequence()
 
@@ -243,6 +256,8 @@ func (gb *Gameboy) powerUpSequence() {
 }
 
 func (gb *Gameboy) Draw(screen *ebiten.Image) {
+	gb.updateWindow()
+
 	if !gb.debugMode {
 		gb.ppu.updateGBScreen(screen, &ebiten.DrawImageOptions{})
 	} else {
@@ -258,10 +273,16 @@ func (gb *Gameboy) Draw(screen *ebiten.Image) {
 		dbgOpt.GeoM.Translate(TILE_DATA_SCREEN_WIDTH, 0)
 		gb.ppu.updateTileMaps(screen, &dbgOpt)
 	}
+}
 
-	if gb.fpsCounter {
-		ebitenutil.DebugPrint(screen, strconv.Itoa(int(ebiten.ActualFPS())))
+func (gb *Gameboy) updateWindow() {
+	emu := fmt.Sprintf("GameboyGo - %s", gb.cart.title)
+	stats := fmt.Sprintf("(FPS: %s, SPEED: 1x)", strconv.Itoa(int(ebiten.ActualFPS())))
+	if gb.speedUp {
+		stats = strings.Replace(stats, "1x", "2x", 1)
 	}
+
+	ebiten.SetWindowTitle(strings.Join([]string{emu, stats}, " "))
 }
 
 func (gb *Gameboy) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {

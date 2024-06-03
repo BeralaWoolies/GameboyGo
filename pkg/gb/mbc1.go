@@ -11,7 +11,6 @@ import (
 
 type MBC1 struct {
 	cart         *Cart
-	ram          []byte
 	ramEnabled   bool
 	romBankMask  uint8
 	romBankNBits uint8
@@ -41,10 +40,6 @@ func (mbc *MBC1) init(cart *Cart) {
 	fmt.Println("Bits to address banks: ", mbc.romBankNBits)
 	fmt.Println("Rom bank mask: ", "0b"+strconv.FormatInt(int64(mbc.romBankMask), 2))
 	fmt.Println("====================================")
-
-	if cart.ramSize != 0 {
-		mbc.ram = make([]byte, cart.ramSize, cart.ramSize)
-	}
 }
 
 func (mbc *MBC1) contains(address uint16) bool {
@@ -76,7 +71,7 @@ func (mbc *MBC1) read(addr uint16) uint8 {
 			bank = mbc.ramBankNum
 		}
 
-		return mbc.ram[(uint32(bank)*0x2000+uint32(addr-EXT_RAM_BASE))%mbc.cart.ramSize]
+		return mbc.cart.ram[(uint32(bank)*0x2000+uint32(addr-EXT_RAM_BASE))%mbc.cart.ramSize]
 	}
 
 	log.Fatalf("MMU mapped an illegal read address: 0x%02x to MBC1", addr)
@@ -123,7 +118,7 @@ func (mbc *MBC1) write(addr uint16, data uint8) {
 			bank = mbc.ramBankNum
 		}
 
-		mbc.ram[(uint32(bank)*0x2000+uint32(addr-EXT_RAM_BASE))%mbc.cart.ramSize] = data
+		mbc.cart.ram[(uint32(bank)*0x2000+uint32(addr-EXT_RAM_BASE))%mbc.cart.ramSize] = data
 		return
 	}
 
