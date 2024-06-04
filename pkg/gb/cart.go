@@ -85,15 +85,29 @@ func (c *Cart) load(filename string) {
 	}
 
 	c.rom = rom
+	if len(c.rom) < 0x150 {
+		log.Fatal("Invalid gameboy cartridge")
+	}
+
+	c.title = strings.ReplaceAll(string(c.rom[0x0134:0x0144]), "\x00", "")
+	if c.title == "" {
+		c.title = "Unknown Title"
+	}
+	c.cartType = c.rom[0x0147]
+	c.battery = strings.Contains(strings.ToLower(cartTypes[int(c.cartType)]), "battery")
+	c.romSize = 32 * (1 << c.rom[0x0148]) * 1024
+	c.ramSize = ramSizes[c.rom[0x0149]]
+	c.hasRam = c.ramSize != 0
+
 	c.ram = make([]byte, c.ramSize, c.ramSize)
 	c.mbc = &MBC1{}
-	c.parseHeader()
 
 	if c.battery {
 		c.ram = c.loadSave(filename)
 	}
 
 	c.mbc.init(c)
+	c.printHeader()
 }
 
 func (c *Cart) loadSave(filename string) mmap.MMap {
@@ -127,22 +141,7 @@ func (c *Cart) syncSave() {
 	fmt.Printf("Flushed save to %s\n", c.savFilename)
 }
 
-func (c *Cart) parseHeader() {
-	if len(c.rom) < 0x150 {
-		log.Fatal("Invalid gameboy cartridge")
-	}
-
-	c.title = strings.ReplaceAll(string(c.rom[0x0134:0x0144]), "\x00", "")
-	if c.title == "" {
-		c.title = "Unknown Title"
-	}
-
-	c.cartType = c.rom[0x0147]
-	c.battery = strings.Contains(strings.ToLower(cartTypes[int(c.cartType)]), "battery")
-	c.romSize = 32 * (1 << c.rom[0x0148]) * 1024
-	c.ramSize = ramSizes[c.rom[0x0149]]
-	c.hasRam = c.ramSize != 0
-
+func (c *Cart) printHeader() {
 	fmt.Println("========= Cartridge Header =========")
 	fmt.Println("Title: ", c.title)
 	fmt.Println("Manufacturer code: ", string(c.rom[0x013F:0x0143]))

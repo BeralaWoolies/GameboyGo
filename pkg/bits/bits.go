@@ -50,8 +50,8 @@ func HexString(val int) string {
 	return fmt.Sprintf("0x%02x", val)
 }
 
-func NBitMask(n uint8) uint8 {
-	res := uint8(0)
+func NBitMask(n uint32) uint32 {
+	res := uint32(0)
 	for bit := 0; bit < int(n); bit++ {
 		res |= (1 << bit)
 	}

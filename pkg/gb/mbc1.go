@@ -10,14 +10,13 @@ import (
 )
 
 type MBC1 struct {
-	cart         *Cart
-	ramEnabled   bool
-	romBankMask  uint8
-	romBankNBits uint8
-	numBanks     uint8
-	ramBankNum   uint8
-	romLo        uint8
-	mode         BankMode
+	cart        *Cart
+	ramEnabled  bool
+	numBanks    uint32
+	romBankMask uint32
+	ramBankNum  uint32
+	romLo       uint32
+	mode        BankMode
 }
 
 type BankMode uint8
@@ -31,13 +30,13 @@ func (mbc *MBC1) init(cart *Cart) {
 	mbc.cart = cart
 	mbc.romLo = 1
 	mbc.mode = MODE0
-	mbc.numBanks = uint8(cart.romSize / 0x4000)
-	mbc.romBankNBits = uint8(math.Log2(float64(mbc.numBanks)))
-	mbc.romBankMask = bits.NBitMask(mbc.romBankNBits)
+	mbc.numBanks = uint32(cart.romSize / 0x4000)
+	nBits := uint32(math.Log2(float64(mbc.numBanks)))
+	mbc.romBankMask = bits.NBitMask(nBits)
 
 	fmt.Println("MBC1 INFO:")
 	fmt.Println("numBanks: ", mbc.numBanks)
-	fmt.Println("Bits to address banks: ", mbc.romBankNBits)
+	fmt.Println("Bits to address banks: ", nBits)
 	fmt.Println("Rom bank mask: ", "0b"+strconv.FormatInt(int64(mbc.romBankMask), 2))
 	fmt.Println("====================================")
 }
@@ -51,7 +50,7 @@ func (mbc *MBC1) read(addr uint16) uint8 {
 		if inRange(addr, ROM_BASE, 0x3FFF) {
 			// bank 00 of rom
 			if mbc.bigROM() && mbc.mode == MODE1 {
-				return mbc.cart.rom[(uint32((mbc.ramBankNum<<5)&mbc.romBankMask)*0x4000)+uint32(addr)]
+				return mbc.cart.rom[(((mbc.ramBankNum<<5)&mbc.romBankMask)*0x4000)+uint32(addr)]
 			}
 
 			return mbc.cart.rom[addr]
@@ -59,14 +58,14 @@ func (mbc *MBC1) read(addr uint16) uint8 {
 
 		if inRange(addr, 0x4000, ROM_TOP) {
 			// switchable bank of rom
-			return mbc.cart.rom[(uint32(((mbc.ramBankNum<<5)|mbc.romLo)&mbc.romBankMask)*0x4000)+uint32(addr-0x4000)]
+			return mbc.cart.rom[((((mbc.ramBankNum<<5)|mbc.romLo)&mbc.romBankMask)*0x4000)+uint32(addr-0x4000)]
 		}
 	} else if inRange(addr, EXT_RAM_BASE, EXT_RAM_TOP) {
 		if !mbc.ramEnabled {
 			return 0xFF
 		}
 
-		bank := uint8(0)
+		bank := uint32(0)
 		if mbc.bigRam() && mbc.mode == MODE1 {
 			bank = mbc.ramBankNum
 		}
@@ -93,13 +92,13 @@ func (mbc *MBC1) write(addr uint16, data uint8) {
 				val = 1
 			}
 
-			mbc.romLo = val & mbc.romBankMask
+			mbc.romLo = uint32(val) & mbc.romBankMask
 			return
 		}
 
 		if inRange(addr, 0x4000, 0x5FFF) {
 			// set either the upper 2 bits of rom bank register or select ram banks 0-3
-			mbc.ramBankNum = data & 0x3
+			mbc.ramBankNum = uint32(data & 0x3)
 			return
 		}
 
@@ -113,7 +112,7 @@ func (mbc *MBC1) write(addr uint16, data uint8) {
 			return
 		}
 
-		bank := uint8(0)
+		bank := uint32(0)
 		if mbc.bigRam() && mbc.mode == MODE1 {
 			bank = mbc.ramBankNum
 		}
