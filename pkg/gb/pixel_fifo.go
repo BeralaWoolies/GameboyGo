@@ -44,7 +44,6 @@ type PixelFIFOItem struct {
 	palette    Palette
 }
 type Palette uint8
-type PixelType uint8
 
 const (
 	ReadTileID     PixelFIFOState = 0
@@ -55,10 +54,6 @@ const (
 	BGP  Palette = 0
 	OBP0 Palette = 1
 	OBP1 Palette = 2
-
-	SPRITE PixelType = 0
-	BG     PixelType = 1
-	WINDOW PixelType = 2
 )
 
 func (pxF *PixelFIFO) init(ppu *PPU) {
