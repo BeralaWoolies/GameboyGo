@@ -15,8 +15,8 @@ type PPU struct {
 	dmac              *DMAController
 	ic                *IntruptController
 	pxF               *PixelFIFO
-	frontBuffer       *ebiten.Image
-	backBuffer        *ebiten.Image
+	frameBuffer       []byte
+	screen            *ebiten.Image
 	dbgTileDataBuffer *ebiten.Image
 	dbgTileMapBuffer  *ebiten.Image
 
@@ -134,8 +134,8 @@ func (ppu *PPU) init(mmu *MMU, dmac *DMAController, ic *IntruptController) {
 	ppu.ic = ic
 	ppu.pxF = &PixelFIFO{}
 	ppu.pxF.init(ppu)
-	ppu.frontBuffer = ebiten.NewImage(GB_SCREEN_WIDTH, GB_SCREEN_HEIGHT)
-	ppu.backBuffer = ebiten.NewImage(GB_SCREEN_WIDTH, GB_SCREEN_HEIGHT)
+	ppu.frameBuffer = make([]byte, 4*GB_SCREEN_WIDTH*GB_SCREEN_HEIGHT, 4*GB_SCREEN_WIDTH*GB_SCREEN_HEIGHT)
+	ppu.screen = ebiten.NewImage(GB_SCREEN_WIDTH, GB_SCREEN_HEIGHT)
 	ppu.dbgTileDataBuffer = ebiten.NewImage(TILE_DATA_SCREEN_WIDTH, TILE_DATA_SCREEN_HEIGHT)
 	ppu.dbgTileMapBuffer = ebiten.NewImage(2*TILE_MAP_SCREEN_WIDTH, TILE_MAP_SCREEN_HEIGHT)
 
@@ -199,7 +199,11 @@ func (ppu *PPU) tick() {
 				color = getLCDColor(ppu.spPalettes[1], pxFItem.color)
 			}
 
-			ppu.backBuffer.Set(int(ppu.lx), int(ppu.ly), color)
+			offset := 4 * ((int(ppu.ly) * GB_SCREEN_WIDTH) + int(ppu.lx))
+			ppu.frameBuffer[offset] = color.R
+			ppu.frameBuffer[offset+1] = color.G
+			ppu.frameBuffer[offset+2] = color.B
+			ppu.frameBuffer[offset+3] = color.A
 			ppu.lx++
 		}
 
@@ -360,17 +364,13 @@ func (ppu *PPU) updateStat(state PPUState) {
 			ppu.ic.requestIntrupt(LCD_INTRUPT_BIT)
 		}
 	case VBLANK:
-		ppu.swapBuffers()
+		ppu.screen.WritePixels(ppu.frameBuffer)
 		ppu.ic.requestIntrupt(VBLANK_INTRUPT_BIT)
 
 		if bits.IsSet(ppu.stat, STAT_SELECT_VBLANK) {
 			ppu.ic.requestIntrupt(LCD_INTRUPT_BIT)
 		}
 	}
-}
-
-func (ppu *PPU) swapBuffers() {
-	ppu.backBuffer, ppu.frontBuffer = ppu.frontBuffer, ppu.backBuffer
 }
 
 func (ppu *PPU) getBGTileMap() uint16 {
@@ -523,7 +523,7 @@ func (ppu *PPU) read(addr uint16) uint8 {
 }
 
 func (ppu *PPU) updateGBScreen(screen *ebiten.Image, opt *ebiten.DrawImageOptions) {
-	screen.DrawImage(ppu.frontBuffer, opt)
+	screen.DrawImage(ppu.screen, opt)
 }
 
 func (ppu *PPU) writeTile(buffer *ebiten.Image, tileId uint16, x int, y int) {
