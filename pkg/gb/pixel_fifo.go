@@ -50,8 +50,7 @@ const (
 	ReadTileID     PixelFIFOState = 0
 	ReadTileDataLo PixelFIFOState = 1
 	ReadTileDataHi PixelFIFOState = 2
-	IDLE           PixelFIFOState = 3
-	PushFIFO       PixelFIFOState = 4
+	PushFIFO       PixelFIFOState = 3
 
 	BGP  Palette = 0
 	OBP0 Palette = 1
@@ -142,8 +141,6 @@ func (pxF *PixelFIFO) tick() {
 
 		_, pxF.tileHiByte = pxF.getTileLine(pxF.tileId, tileLine)
 
-		pxF.setState(IDLE)
-	case IDLE:
 		pxF.setState(PushFIFO)
 	case PushFIFO:
 		// Check if sprite fetch is pending, attempt to finish up BG/Win fetch, and cache if we can't then switch into
