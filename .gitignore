@@ -1,1 +1,4 @@
 boot_rom.bin
+games/
+*.prof
+saves/
