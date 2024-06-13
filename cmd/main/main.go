@@ -16,6 +16,7 @@ var memprofile *string = flag.String("memprofile", "", "write memory profile to 
 var rom *string = flag.String("rom", "", "must specify a .gb or .gbc rom")
 var bootrom *string = flag.String("bootrom", "", "optionally play the boot rom")
 var debugMode *bool = flag.Bool("d", false, "optionally enable debug mode")
+var stats *bool = flag.Bool("stats", false, "optionally enable fps and emu speed tracking")
 
 func main() {
 	parseArgs()
@@ -24,6 +25,7 @@ func main() {
 		Filename:        *rom,
 		DebugMode:       *debugMode,
 		BootRomFilename: *bootrom,
+		Stats:           *stats,
 	})
 	gameboy.Start()
 }

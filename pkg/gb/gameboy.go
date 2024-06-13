@@ -32,6 +32,7 @@ type GameboyOptions struct {
 	Filename        string
 	DebugMode       bool
 	BootRomFilename string
+	Stats           bool
 }
 
 const (
@@ -288,9 +289,13 @@ func (gb *Gameboy) Draw(screen *ebiten.Image) {
 
 func (gb *Gameboy) updateWindow() {
 	emu := fmt.Sprintf("GameboyGo - %s", gb.cart.title)
-	stats := fmt.Sprintf("(FPS: %s, SPEED: 1x)", strconv.Itoa(int(ebiten.ActualFPS())))
-	if gb.speedUp {
-		stats = strings.Replace(stats, "1x", "2x", 1)
+
+	stats := ""
+	if gb.opts.Stats {
+		stats = fmt.Sprintf("(FPS: %s, SPEED: 1x)", strconv.Itoa(int(ebiten.ActualFPS())))
+		if gb.speedUp {
+			stats = strings.Replace(stats, "1x", "2x", 1)
+		}
 	}
 
 	ebiten.SetWindowTitle(strings.Join([]string{emu, stats}, " "))
