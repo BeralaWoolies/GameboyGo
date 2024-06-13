@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"runtime"
@@ -12,10 +13,22 @@ import (
 
 var cpuprofile *string = flag.String("cpuprofile", "", "write cpu profile to `file`")
 var memprofile *string = flag.String("memprofile", "", "write memory profile to `file`")
-var rom *string = flag.String("rom", "", "specify a .gb rom")
-var debugMode *bool = flag.Bool("d", false, "specify -d to enable debug mode")
+var rom *string = flag.String("rom", "", "must specify a .gb or .gbc rom")
+var bootrom *string = flag.String("bootrom", "", "optionally play the boot rom")
+var debugMode *bool = flag.Bool("d", false, "optionally enable debug mode")
 
 func main() {
+	parseArgs()
+
+	gameboy := gb.NewGameboy(gb.GameboyOptions{
+		Filename:        *rom,
+		DebugMode:       *debugMode,
+		BootRomFilename: *bootrom,
+	})
+	gameboy.Start()
+}
+
+func parseArgs() {
 	flag.Parse()
 
 	if *cpuprofile != "" {
@@ -42,6 +55,9 @@ func main() {
 		}
 	}
 
-	gameboy := gb.NewGameboy(*rom, *debugMode)
-	gameboy.Start()
+	if *rom == "" {
+		fmt.Println("Must specify a .gb or .gbc rom")
+		flag.Usage()
+		os.Exit(2)
+	}
 }

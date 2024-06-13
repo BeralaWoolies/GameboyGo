@@ -20,12 +20,18 @@ type Gameboy struct {
 	dmac         *DMAController
 	ic           *IntruptController
 	btnMappings  map[ebiten.Key]func(pressed bool)
-	debugMode    bool
+	opts         GameboyOptions
 	screenWidth  int
 	screenHeight int
 	windowWidth  int
 	windowHeight int
 	speedUp      bool
+}
+
+type GameboyOptions struct {
+	Filename        string
+	DebugMode       bool
+	BootRomFilename string
 }
 
 const (
@@ -42,11 +48,11 @@ const (
 	TILE_MAP_SCREEN_HEIGHT = 256
 )
 
-func NewGameboy(filename string, debugMode bool) *Gameboy {
-	gb := &Gameboy{debugMode: debugMode}
-	gb.init(filename)
+func NewGameboy(opts GameboyOptions) *Gameboy {
+	gb := &Gameboy{opts: opts}
+	gb.init(opts.Filename)
 
-	if debugMode {
+	if gb.opts.DebugMode {
 		gb.screenWidth = GB_SCREEN_WIDTH + TILE_DATA_SCREEN_WIDTH + (2 * TILE_MAP_SCREEN_WIDTH)
 		gb.screenHeight = max(GB_SCREEN_HEIGHT, TILE_DATA_SCREEN_HEIGHT, TILE_MAP_SCREEN_HEIGHT)
 		gb.windowWidth = gb.screenWidth * 3
@@ -89,7 +95,9 @@ func (gb *Gameboy) initHardware(filename string) {
 }
 
 func (gb *Gameboy) initMemoryMap() {
-	gb.mmu.mapAddrSpace(newBootROM("boot_rom.bin", gb.mmu))
+	if gb.hasBootRom() {
+		gb.mmu.mapAddrSpace(newBootROM(gb.opts.BootRomFilename, gb.mmu))
+	}
 	gb.mmu.mapAddrSpace(gb.cart)
 	gb.mmu.mapAddrSpace(gb.ppu)
 	gb.mmu.mapAddrSpace(gb.joyp)
@@ -99,9 +107,10 @@ func (gb *Gameboy) initMemoryMap() {
 
 	// for now have our generic RAM be last in precedence to "catch" unimplemented addresses
 	gb.mmu.mapAddrSpace(newGenericRAM())
+}
 
-	// manually disable boot rom for now
-	gb.mmu.write(BOOT_ROM_ENABLE_ADDR, 1)
+func (gb *Gameboy) hasBootRom() bool {
+	return gb.opts.BootRomFilename != ""
 }
 
 func (gb *Gameboy) bindUIEvents() {
@@ -149,7 +158,7 @@ func (gb *Gameboy) Start() {
 	ebiten.SetWindowTitle(fmt.Sprintf("GameboyGo - %s", gb.cart.title))
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	ebiten.SetTPS(FPS)
-	if !gb.debugMode {
+	if !gb.opts.DebugMode {
 		ebiten.SetVsyncEnabled(true)
 	} else {
 		ebiten.SetVsyncEnabled(false)
@@ -157,7 +166,9 @@ func (gb *Gameboy) Start() {
 
 	defer gb.cart.syncSave()
 
-	gb.powerUpSequence()
+	if !gb.hasBootRom() {
+		gb.powerUpSequence()
+	}
 
 	if err := ebiten.RunGame(gb); err != nil {
 		log.Fatal(err)
@@ -258,7 +269,7 @@ func (gb *Gameboy) powerUpSequence() {
 func (gb *Gameboy) Draw(screen *ebiten.Image) {
 	gb.updateWindow()
 
-	if !gb.debugMode {
+	if !gb.opts.DebugMode {
 		gb.ppu.updateGBScreen(screen, &ebiten.DrawImageOptions{})
 	} else {
 		opt := ebiten.DrawImageOptions{}
