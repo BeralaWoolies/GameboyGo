@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/BeralaWoolies/GameboyGo/pkg/bits"
@@ -16,13 +17,18 @@ type Cart struct {
 	romSize     uint32
 	ramSize     uint32
 	title       string
-	savFilename string
+	savFilePath string
 
-	mbc      *MBC1
+	mbc      MemoryBankController
 	cartType uint8
 
 	hasRam  bool
 	battery bool
+}
+
+type MemoryBankController interface {
+	Addressable
+	init(cart *Cart)
 }
 
 const (
@@ -100,19 +106,32 @@ func (c *Cart) load(filename string) {
 	c.hasRam = c.ramSize != 0
 
 	c.ram = make([]byte, c.ramSize, c.ramSize)
-	c.mbc = &MBC1{}
+	if c.cartType >= 0x01 && c.cartType <= 0x03 {
+		c.mbc = &MBC1{}
+	} else if c.cartType >= 0x0F && c.cartType <= 0x13 {
+		c.mbc = &MBC3{}
+	}
 
 	if c.battery {
 		c.ram = c.loadSave(filename)
 	}
 
-	c.mbc.init(c)
 	c.printHeader()
+	if !c.romOnly() {
+		c.mbc.init(c)
+	}
 }
 
 func (c *Cart) loadSave(filename string) mmap.MMap {
-	c.savFilename = fmt.Sprintf("%s.sav", strings.TrimSuffix(filename, ".gb"))
-	sav, err := os.OpenFile(c.savFilename, os.O_CREATE|os.O_RDWR, 0644)
+	savDir := "saves"
+	if err := os.MkdirAll(savDir, os.ModePerm); err != nil {
+		log.Fatal(err)
+	}
+
+	savFilename := fmt.Sprintf("%s.sav", strings.TrimSuffix(filepath.Base(filename), filepath.Ext(filename)))
+	c.savFilePath = filepath.Join(savDir, savFilename)
+
+	sav, err := os.OpenFile(c.savFilePath, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -138,7 +157,7 @@ func (c *Cart) syncSave() {
 
 	c.ram.Flush()
 	c.ram.Unmap()
-	fmt.Printf("Flushed save to %s\n", c.savFilename)
+	fmt.Printf("Flushed save to %s\n", c.savFilePath)
 }
 
 func (c *Cart) printHeader() {
