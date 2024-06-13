@@ -95,7 +95,7 @@ func (c *Cart) load(filename string) {
 		log.Fatal("Invalid gameboy cartridge")
 	}
 
-	c.title = strings.ReplaceAll(string(c.rom[0x0134:0x0144]), "\x00", "")
+	c.title = strings.ReplaceAll(string(c.rom[0x0134:0x013F]), "\x00", "")
 	if c.title == "" {
 		c.title = "Unknown Title"
 	}
