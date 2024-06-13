@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
 type Gameboy struct {
@@ -124,12 +125,11 @@ func (gb *Gameboy) bindUIEvents() {
 		ebiten.KeyS:          gb.joyp.b.press,
 		ebiten.KeySpace:      gb.joyp.sel.press,
 		ebiten.KeyEnter:      gb.joyp.start.press,
-		ebiten.KeyD:          gb.setSpeed,
 	}
 }
 
-func (gb *Gameboy) setSpeed(speedUp bool) {
-	gb.speedUp = speedUp
+func (gb *Gameboy) toggleSpeed() {
+	gb.speedUp = !gb.speedUp
 
 	if gb.speedUp {
 		ebiten.SetTPS(FPS * 2)
@@ -200,6 +200,10 @@ func (gb *Gameboy) Update() error {
 func (gb *Gameboy) handleUIEvents() {
 	for kbKey, press := range gb.btnMappings {
 		press(ebiten.IsKeyPressed(kbKey))
+	}
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyD) {
+		gb.toggleSpeed()
 	}
 }
 
