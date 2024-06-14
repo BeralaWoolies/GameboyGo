@@ -158,16 +158,17 @@ All options:
 
 ### Controls
 
-| Keyboard             | Joypad        |
-| -------------------- | ------------- |
-| <kbd>&uarr;</kbd>    | &uarr; button |
-| <kbd>&darr;</kbd>    | &darr; button |
-| <kbd>&rarr;</kbd>    | &rarr; button |
-| <kbd>&larr;</kbd>    | &larr; button |
-| <kbd>A</kbd>         | A button      |
-| <kbd>S</kbd>         | B button      |
-| <kbd>Enter</kbd>     | Start button  |
-| <kbd>Space</kbd>     | Select button |
+| Keyboard             | Joypad/Emulator |
+| -------------------- | --------------- |
+| <kbd>&uarr;</kbd>    | &uarr; button   |
+| <kbd>&darr;</kbd>    | &darr; button   |
+| <kbd>&rarr;</kbd>    | &rarr; button   |
+| <kbd>&larr;</kbd>    | &larr; button   |
+| <kbd>A</kbd>         | A button        |
+| <kbd>S</kbd>         | B button        |
+| <kbd>Enter</kbd>     | Start button    |
+| <kbd>Space</kbd>     | Select button   |
+| <kbd>D</kbd>         | toggle 2x speed |
 
 ### Saving
 If the loaded rom supports battery backed saves, a `<rom-name>.sav` (e.g `pokemon-gold.sav`) file containing the cartridge RAM dump is created under the directory `./saves/`. The emulator maps `<rom-name>.sav` into main memory during runtime allowing all RAM writes to be flushed into the `.sav` file eventually.
