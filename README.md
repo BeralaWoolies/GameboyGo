@@ -10,33 +10,35 @@
 ## GameboyGo
 
 <!-- TABLE OF CONTENTS -->
-<summary>Table of Contents</summary>
-<ol>
-    <li>
-        <a href="#about-the-project">About The Project</a>
-        <ul>
-        <li><a href="#built-with">Built With</a></li>
-        </ul>
-    </li>
-    <li>
-        <a href="#getting-started">Getting Started</a>
-        <ul>
-        <li><a href="#prerequisites">Prerequisites</a></li>
-        <li><a href="#installation">Installation</a></li>
-        </ul>
-    </li>
-    <li>
-        <a href="#usage">Usage</a>
-        <ul>
-            <li><a href="#controls">Controls</a></li>
-            <li><a href="#saving">Saving</a></li>
-        </ul>
-    </li>
-    <li><a href="#testing">Testing</a></li>
-    <li><a href="#features">Features</a></li>
-    <li><a href="#license">License</a></li>
-    <li><a href="#resources">Resources</a></li>
-</ol>
+<Details>
+    <summary>Table of Contents</summary>
+    <ol>
+        <li>
+            <a href="#about-the-project">About The Project</a>
+            <ul>
+            <li><a href="#built-with">Built With</a></li>
+            </ul>
+        </li>
+        <li>
+            <a href="#getting-started">Getting Started</a>
+            <ul>
+            <li><a href="#prerequisites">Prerequisites</a></li>
+            <li><a href="#installation">Installation</a></li>
+            </ul>
+        </li>
+        <li>
+            <a href="#usage">Usage</a>
+            <ul>
+                <li><a href="#controls">Controls</a></li>
+                <li><a href="#saving">Saving</a></li>
+            </ul>
+        </li>
+        <li><a href="#testing">Testing</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#license">License</a></li>
+        <li><a href="#resources">Resources</a></li>
+    </ol>
+</details>
 
 
 
@@ -44,14 +46,16 @@
 
 GameboyGo is a cross-platform Nintendo Gameboy emulator written in Go. This emulator aims for instruction accuracy and leverages Ebiten for handling 2D graphics and keyboard input. I developed GameboyGo as a hobby to learn the basics of low-level emulation development to re-create the nostalgic experience of playing classic Nintendo games.
 
-<img src="./docs/pkm_gold_title.png" alt="pokemon gold title screen" width="250"/>
-<img src="./docs/tetris_title.png" alt="tetris title screen" width="250"/>
-<img src="./docs/zelda_title.png" alt="zelda title screen" width="250"/>
-<img src="./docs/pkm_red_title.png" alt="pokemon red title screen" width="250"/>
-<img src="./docs/super_mario_title.png" alt="super mario title screen" width="250"/>
-<img src="./docs/kirby2_title.png" alt="kirby 2 title screen" width="250"/>
-<img src="./docs/metroid_title.png" alt="metroid title screen" width="250"/>
-<img src="./docs/asteroids_title.png" alt="astreoids title screen" width="250"/>
+<div style="display: flex; flex-wrap: wrap;">
+    <img src="./docs/pkm_gold_title.png" alt="pokemon gold title screen" width="400"/>
+    <img src="./docs/tetris_title.png" alt="tetris title screen" width="400"/>
+    <img src="./docs/zelda_title.png" alt="zelda title screen" width="400"/>
+    <img src="./docs/pkm_red_title.png" alt="pokemon red title screen" width="400"/>
+    <img src="./docs/super_mario_title.png" alt="super mario title screen" width="400"/>
+    <img src="./docs/kirby2_title.png" alt="kirby 2 title screen" width="400"/>
+    <img src="./docs/metroid_title.png" alt="metroid title screen" width="400"/>
+    <img src="./docs/asteroids_title.png" alt="astreoids title screen" width="400"/>
+</div>
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -179,7 +183,7 @@ GameboyGo passes all individual [Blargg's](https://github.com/retrio/gb-test-rom
 GameboyGo passes [`dmg-acid2.gb`](https://github.com/mattcurrie/dmg-acid2) which tests for correct sprite, background and window rendering. It also tests for correct LCD scrolling,
 palettes, sprite priority and sprite flipping.
 
-<img src="./docs/dmg_acid2.png" alt="dmg-acid2 correct screen" width="375"/>
+<img src="./docs/dmg_acid2.png" alt="dmg-acid2 correct screen" width="400"/>
 
 ### Memory Bank Controllers
 GameboyGo passes all tests in `./tests/mbc1` (except for `multicart_rom_8Mb.gb`) and `./tests/mbc3`.
@@ -215,10 +219,12 @@ GameboyGo passes all tests in `./tests/mbc1` (except for `multicart_rom_8Mb.gb`)
         - [ ] RTC (Real Time Clock) implementation
     - [ ] MBC5
 
-<img src="./docs/super_mario.gif" alt="super mario gameplay" width="250"/>
-<img src="./docs/tetris.gif" alt="tetris gameplay" width="250"/>
-<img src="./docs/zelda.gif" alt="zelda gameplay" width="250"/>
-<img src="./docs/pkm_red.gif" alt="pokemon red gameplay" width="250"/>
+<div style="display: flex; flex-wrap: wrap; gap: 10px">
+    <img src="./docs/super_mario.gif" alt="super mario gameplay" width="400"/>
+    <img src="./docs/tetris.gif" alt="tetris gameplay" width="400"/>
+    <img src="./docs/zelda.gif" alt="zelda gameplay" width="400"/>
+    <img src="./docs/pkm_red.gif" alt="pokemon red gameplay" width="400"/>
+</div>
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
