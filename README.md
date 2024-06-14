@@ -34,6 +34,7 @@
             </ul>
         </li>
         <li><a href="#testing">Testing</a></li>
+        <li><a href="#contributing">Contributing</a></li>
         <li><a href="#features">Features</a></li>
         <li><a href="#license">License</a></li>
         <li><a href="#resources">Resources</a></li>
@@ -187,6 +188,24 @@ palettes, sprite priority and sprite flipping.
 
 ### Memory Bank Controllers
 GameboyGo passes all tests in `./tests/mbc1` (except for `multicart_rom_8Mb.gb`) and `./tests/mbc3`.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+
+## Contributing
+
+Any contributions are greatly appreciated and welcomed! GameboyGo still has various small bugs that can appear in games so don't hesitate to play around and experiment with the project.
+
+Please feel free to open any pull requests to this project by:
+
+1. Forking the repository.
+2. Creating your feature branch (`git checkout -b feature/yourFeature`).
+3. Committing your changes (`git commit -m 'Add some yourFeature'`).
+4. Pushing to the branch (`git push origin feature/yourFeature`).
+5. Opening a pull request.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
 
