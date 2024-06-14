@@ -14,7 +14,7 @@ import (
 var cpuprofile *string = flag.String("cpuprofile", "", "write cpu profile to `file`")
 var memprofile *string = flag.String("memprofile", "", "write memory profile to `file`")
 var rom *string = flag.String("rom", "", "must specify a .gb or .gbc rom")
-var bootrom *string = flag.String("bootrom", "", "optionally play the boot rom")
+var bootrom *string = flag.String("bootrom", "", "optionally specify a boot rom to play")
 var debugMode *bool = flag.Bool("d", false, "optionally enable debug mode")
 var stats *bool = flag.Bool("stats", false, "optionally enable fps and emu speed tracking")
 
