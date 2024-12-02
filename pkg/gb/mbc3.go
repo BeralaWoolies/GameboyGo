@@ -113,7 +113,7 @@ func (mbc *MBC3) write(addr uint16, data uint8) {
 
 		if inRange(addr, 0x4000, 0x5FFF) {
 			// set either the upper 2 bits of rom bank register or select ram banks 0-3
-			if data >= 0 && data <= 0x03 {
+			if data <= 0x03 {
 				mbc.ramBankNum = uint32(data & 0x3)
 				mbc.mode = SelectMode(RAM_SELECT)
 				return
@@ -156,11 +156,6 @@ func (mbc *MBC3) write(addr uint16, data uint8) {
 	}
 
 	log.Fatalf("MMU mapped an illegal write address: 0x%02x to MBC3", addr)
-}
-
-func (mbc *MBC3) bigROM() bool {
-	// ROM can make use of the 2-bit register
-	return mbc.cart.romSize >= 0x100000
 }
 
 func (mbc *MBC3) bigRam() bool {

@@ -297,7 +297,7 @@ func (pxF *PixelFIFO) getTileLine(tileId uint8, tileLine uint16) (loByte uint8, 
 
 func (pxF *PixelFIFO) pop() (PixelFIFOItem, error) {
 	if pxF.spriteFetch || !pxF.spriteFetchFIFO.IsEmpty() {
-		return PixelFIFOItem{}, fmt.Errorf("Pixel fetching is suspended")
+		return PixelFIFOItem{}, fmt.Errorf("pixel fetching is suspended")
 	}
 
 	if !pxF.bgFIFO.IsEmpty() {

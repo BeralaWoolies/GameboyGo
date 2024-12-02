@@ -134,7 +134,7 @@ func (ppu *PPU) init(mmu *MMU, dmac *DMAController, ic *IntruptController) {
 	ppu.ic = ic
 	ppu.pxF = &PixelFIFO{}
 	ppu.pxF.init(ppu)
-	ppu.frameBuffer = make([]byte, 4*GB_SCREEN_WIDTH*GB_SCREEN_HEIGHT, 4*GB_SCREEN_WIDTH*GB_SCREEN_HEIGHT)
+	ppu.frameBuffer = make([]byte, 4*GB_SCREEN_WIDTH*GB_SCREEN_HEIGHT)
 	ppu.screen = ebiten.NewImage(GB_SCREEN_WIDTH, GB_SCREEN_HEIGHT)
 	ppu.dbgTileDataBuffer = ebiten.NewImage(TILE_DATA_SCREEN_WIDTH, TILE_DATA_SCREEN_HEIGHT)
 	ppu.dbgTileMapBuffer = ebiten.NewImage(2*TILE_MAP_SCREEN_WIDTH, TILE_MAP_SCREEN_HEIGHT)

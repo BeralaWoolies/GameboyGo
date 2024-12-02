@@ -105,7 +105,7 @@ func (c *Cart) load(filename string) {
 	c.ramSize = ramSizes[c.rom[0x0149]]
 	c.hasRam = c.ramSize != 0
 
-	c.ram = make([]byte, c.ramSize, c.ramSize)
+	c.ram = make([]byte, c.ramSize)
 	if c.cartType >= 0x01 && c.cartType <= 0x03 {
 		c.mbc = &MBC1{}
 	} else if c.cartType >= 0x0F && c.cartType <= 0x13 {
